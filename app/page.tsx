@@ -16,7 +16,7 @@ import FeaturesSection from "@/components/FeaturesSection";
 import PricingSection from "@/components/PricingSection";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
-import ProgressDisplay from "@/components/ProgressDisplay";
+import MasteringProgressModal from "@/components/MasteringProgressModal";
 import { AudioEngineProvider } from "@/contexts/AudioEngineContext";
 
 export type AppState = "idle" | "uploaded" | "analyzing" | "analyzed" | "mastering" | "done";
@@ -100,9 +100,8 @@ export default function Home() {
   const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
   const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
 
-  // Scroll targets
-  const mainPanelRef      = useRef<HTMLDivElement>(null);   // for reset (scroll to top of panel)
-  const progressAnchorRef = useRef<HTMLDivElement>(null);   // for mastering start (scroll to progress)
+  // Scroll target for reset
+  const mainPanelRef = useRef<HTMLDivElement>(null);
 
   // Guard: prevents stale handleMasteringComplete / handleMasteringError
   // callbacks from updating state after a reset or remaster.
@@ -117,18 +116,6 @@ export default function Home() {
     }, 50);
   }, []);
 
-  // Scroll to the progress section — wait 500 ms so React has rendered
-  // ProgressDisplay, then use explicit window.scrollTo (more reliable
-  // than scrollIntoView on a zero-height anchor div).
-  const scrollToProgress = useCallback(() => {
-    setTimeout(() => {
-      const el = progressAnchorRef.current;
-      if (!el) return;
-      const y = el.getBoundingClientRect().top + window.scrollY - 120;
-      window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-    }, 500);
-  }, []);
-
   const handleUploadComplete   = useCallback((file: UploadedFile) => { setUploadedFile(file); setAppState("uploaded"); }, []);
   const handleAnalysisComplete = useCallback((data: AnalysisData) => { setAnalysis(data); setAppState("analyzed"); }, []);
 
@@ -136,8 +123,8 @@ export default function Home() {
     isMasteringRef.current = true;
     setAppState("mastering");
     setCurrentProgress({ step: "analyzing", label: "Analyzing track…", progress: 5 });
-    scrollToProgress();
-  }, [scrollToProgress]);
+    // No scroll needed — progress is shown in a modal overlay
+  }, []);
 
   const handleProgressUpdate = useCallback((step: ProgressStep) => setCurrentProgress(step), []);
 
@@ -340,49 +327,7 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* Scroll anchor — always in DOM so progressAnchorRef is always set */}
-            <div ref={progressAnchorRef} />
-
-            {/* Progress Display */}
-            <AnimatePresence>
-              {appState === "mastering" && currentProgress && (
-                <motion.div
-                  key="progress"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  <ProgressDisplay step={currentProgress} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Inline format picker — only shown while mastering (progress reference) */}
-            <AnimatePresence>
-              {appState === "mastering" && uploadedFile && (
-                <motion.div
-                  key="masteringBtn"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <MasterButton
-                    fileId={uploadedFile.file_id}
-                    platform={platform}
-                    preset={preset}
-                    intensity={intensity}
-                    selectedFormat={selectedFormat}
-                    analysis={analysis ?? undefined}
-                    isProcessing={true}
-                    onStart={handleMasteringStart}
-                    onProgress={handleProgressUpdate}
-                    onComplete={handleMasteringComplete}
-                    onError={handleMasteringError}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Mastering progress is shown in a modal overlay — see MasteringProgressModal below */}
 
             {/* Download Panel — includes A/B player with master */}
             <AnimatePresence>
@@ -480,6 +425,12 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Mastering progress modal ─────────────────────────────────────────── */}
+      <MasteringProgressModal
+        isOpen={appState === "mastering"}
+        step={currentProgress}
+      />
 
       <FeaturesSection />
       <PricingSection />
