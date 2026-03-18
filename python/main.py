@@ -171,7 +171,7 @@ async def master(req: MasterRequest):
 
             loop = asyncio.get_event_loop()
             mastering_task = loop.run_in_executor(
-                None, master_audio, req.file_path, params, req.output_dir, None, req.format
+                None, master_audio, req.file_path, params, req.output_dir, None, req.format, analysis_dict
             )
 
             # Emit progress while mastering runs

@@ -381,6 +381,107 @@ def export_formats(audio: np.ndarray, sr: int, output_dir: str, master_id: str, 
     return paths
 
 
+# ─── FAST POST-ANALYSIS (in-memory, no librosa BPM/key re-run) ────────────────
+
+def _quick_post_analysis(audio: np.ndarray, sr: int, params: "MasteringParams",
+                          pre_bpm: float = 0.0, pre_key: str = "Unknown") -> dict:
+    """Compute only loudness/dynamics/spectral on the mastered numpy array.
+    BPM and key are copied from params (they don't change after mastering).
+    This avoids a second slow librosa.load + beat_track call (~30-60s).
+    """
+    import math
+
+    mono = audio[0] if audio.ndim == 2 else audio
+    left = audio[0] if audio.ndim == 2 else audio
+    right = audio[1] if audio.ndim == 2 else audio
+    is_stereo = audio.ndim == 2
+
+    def safe(v, default=0.0):
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return default
+        return float(v)
+
+    # Integrated LUFS
+    meter = pyln.Meter(sr)
+    lufs_in = np.stack([left, right], axis=1) if is_stereo else mono.reshape(-1, 1)
+    try:
+        integrated_lufs = safe(meter.integrated_loudness(lufs_in), -70.0)
+    except Exception:
+        integrated_lufs = -70.0
+
+    # True peak
+    peak = float(np.max(np.abs(mono)))
+    true_peak = safe(20 * np.log10(peak) if peak > 1e-10 else -120.0, -120.0)
+
+    # DR / crest
+    rms_total = float(np.sqrt(np.mean(mono ** 2)))
+    crest_factor = safe(20 * np.log10(peak / max(rms_total, 1e-10)), 0.0)
+    from analyzer import compute_dr, rms_band
+    dr_value = safe(compute_dr(mono), 0.0)
+
+    # Per-band RMS
+    rms_sub  = safe(rms_band(mono, sr,    20,    80), -80.0)
+    rms_low  = safe(rms_band(mono, sr,    80,   500), -80.0)
+    rms_mid  = safe(rms_band(mono, sr,   500,  5000), -80.0)
+    rms_high = safe(rms_band(mono, sr,  5000, 12000), -80.0)
+    rms_air  = safe(rms_band(mono, sr, 12000, 20000), -80.0)
+
+    # Spectral (fast numpy, no librosa)
+    fft = np.abs(np.fft.rfft(mono[:min(len(mono), sr * 5)]))  # max 5s for speed
+    freqs = np.fft.rfftfreq(min(len(mono), sr * 5), 1 / sr)
+    fft_sum = np.sum(fft) or 1.0
+    spectral_centroid = safe(float(np.sum(freqs * fft) / fft_sum), 0.0)
+    cumsum = np.cumsum(fft)
+    rolloff_idx = np.searchsorted(cumsum, 0.85 * cumsum[-1])
+    spectral_rolloff = safe(float(freqs[min(rolloff_idx, len(freqs) - 1)]), 0.0)
+    spectral_flatness = safe(float(
+        np.exp(np.mean(np.log(fft + 1e-10))) / (np.mean(fft) + 1e-10)
+    ), 0.0)
+
+    # Stereo
+    if is_stereo:
+        mid_s  = (left + right) / 2
+        side_s = (left - right) / 2
+        stereo_width = safe(
+            float(np.sqrt(np.mean(side_s ** 2)) / max(np.sqrt(np.mean(mid_s ** 2)), 1e-10)), 0.0
+        )
+        mono_compat = safe(
+            float(np.corrcoef(left, right)[0, 1]) if np.std(left) > 0 and np.std(right) > 0 else 1.0,
+            1.0
+        )
+    else:
+        stereo_width = 0.0
+        mono_compat  = 1.0
+
+    duration = float(len(mono) / sr)
+
+    return {
+        "integrated_lufs":    integrated_lufs,
+        "true_peak":          true_peak,
+        "dr_value":           dr_value,
+        "crest_factor":       crest_factor,
+        "rms_sub":            rms_sub,
+        "rms_low":            rms_low,
+        "rms_mid":            rms_mid,
+        "rms_high":           rms_high,
+        "rms_air":            rms_air,
+        "spectral_centroid":  spectral_centroid,
+        "spectral_rolloff":   spectral_rolloff,
+        "spectral_flatness":  spectral_flatness,
+        "stereo_width":       stereo_width,
+        "mono_compatibility": mono_compat,
+        "bpm":                safe(pre_bpm, 0.0),
+        "key":                pre_key,
+        "transient_density":  0.0,
+        "clipping_detected":  bool(np.any(np.abs(mono) > 0.99)),
+        "dc_offset":          safe(float(np.mean(mono)), 0.0),
+        "duration_seconds":   duration,
+        "sample_rate":        int(sr),
+        "bit_depth":          24,
+        "channels":           2 if is_stereo else 1,
+    }
+
+
 # ─── MAIN MASTERING FUNCTION ───────────────────────────────────────────────────
 
 def master_audio(
@@ -389,6 +490,7 @@ def master_audio(
     output_dir: str,
     progress_callback: Optional[Callable[[str, int], None]] = None,
     selected_format: str = "mp3128",
+    pre_analysis: Optional[dict] = None,
 ) -> MasteringResult:
     """Execute the full 12-stage mastering chain."""
 
@@ -451,13 +553,10 @@ def master_audio(
     master_id = str(uuid.uuid4())
     paths = export_formats(audio, sr, output_dir, master_id, selected_format)
 
-    # Post-analysis
-    from analyzer import analyze_audio, analysis_to_dict
-    # Write temp file for analysis
-    tmp = os.path.join(output_dir, f"{master_id}_analysis_tmp.wav")
-    sf.write(tmp, audio.T, sr, subtype="PCM_24")
-    post_analysis = analysis_to_dict(analyze_audio(tmp))
-    os.remove(tmp)
+    # Post-analysis — lightweight in-memory measurement (skip BPM/key, they don't change)
+    pre_bpm = float(pre_analysis.get("bpm", 0.0)) if pre_analysis else 0.0
+    pre_key = str(pre_analysis.get("key", "Unknown")) if pre_analysis else "Unknown"
+    post_analysis = _quick_post_analysis(audio, sr, params, pre_bpm, pre_key)
 
     emit("complete", 100)
 
