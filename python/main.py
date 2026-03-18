@@ -198,12 +198,21 @@ async def master(req: MasterRequest):
                     ext = path.split(".")[-1]
                     formats[fmt] = f"{base_url}?master_id={result.master_id}&format={fmt}"
 
+            # Sanitize post_analysis before JSON encoding (NaN/Inf → safe defaults)
+            post = result.post_analysis
+            if isinstance(post, dict):
+                import math
+                post = {
+                    k: (0.0 if isinstance(v, float) and (math.isnan(v) or math.isinf(v)) else v)
+                    for k, v in post.items()
+                }
+
             yield encode({
                 "step": "complete",
                 "progress": 100,
                 "master_id": result.master_id,
                 "formats": formats,
-                "post_analysis": result.post_analysis,
+                "post_analysis": post,
                 "notes": result.notes,
             })
 

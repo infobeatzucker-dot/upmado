@@ -262,10 +262,55 @@ def analyze_audio(file_path: str) -> AudioAnalysis:
         dc_offset=dc_offset,
         duration_seconds=duration,
         sample_rate=sr,
-        bit_depth=info.subtype_info.split()[0].replace("PCM_", "").replace("FLOAT", "32") if info.subtype_info else "24",
+        bit_depth=_parse_bit_depth(info.subtype_info),
         channels=2 if is_stereo else 1,
     )
 
 
+def _parse_bit_depth(subtype_info: str) -> int:
+    """Parse bit depth from soundfile subtype string, e.g. 'PCM_24' → 24."""
+    if not subtype_info:
+        return 24
+    s = subtype_info.split()[0]
+    s = s.replace("PCM_", "").replace("FLOAT", "32").replace("DOUBLE", "64")
+    try:
+        return int(s)
+    except ValueError:
+        return 24
+
+
+def _sanitize_float(v, default: float = 0.0) -> float:
+    """Replace NaN / ±Inf with a safe default so JSON serialization never fails."""
+    import math
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return default
+    return v
+
+
 def analysis_to_dict(a: AudioAnalysis) -> dict:
-    return asdict(a)
+    d = asdict(a)
+    # Sanitize every float field – pyloudnorm can emit -inf, librosa can emit NaN
+    FLOAT_DEFAULTS: dict = {
+        "integrated_lufs": -70.0,
+        "true_peak":       -120.0,
+        "dr_value":         0.0,
+        "crest_factor":     0.0,
+        "rms_sub":         -80.0,
+        "rms_low":         -80.0,
+        "rms_mid":         -80.0,
+        "rms_high":        -80.0,
+        "rms_air":         -80.0,
+        "spectral_centroid": 0.0,
+        "spectral_rolloff":  0.0,
+        "spectral_flatness": 0.0,
+        "stereo_width":      0.0,
+        "mono_compatibility": 1.0,
+        "bpm":               0.0,
+        "transient_density": 0.0,
+        "dc_offset":         0.0,
+        "duration_seconds":  0.0,
+    }
+    for key, default in FLOAT_DEFAULTS.items():
+        if key in d:
+            d[key] = _sanitize_float(d[key], default)
+    return d
