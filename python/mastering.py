@@ -42,7 +42,7 @@ def remove_dc_offset(audio: np.ndarray) -> np.ndarray:
     if audio.ndim == 2:
         return np.stack([remove_dc_offset(audio[0]), remove_dc_offset(audio[1])])
     b, a = scipy_signal.butter(2, 2.0 / (audio.shape[0] * 0.001), btype="highpass", fs=44100)
-    return scipy_signal.filtfilt(b, a, audio)
+    return scipy_signal.lfilter(b, a, audio)
 
 
 def remove_dc_simple(audio: np.ndarray) -> np.ndarray:
@@ -103,35 +103,29 @@ def apply_correction_eq(audio: np.ndarray, sr: int, params: MasteringParams) -> 
 # ─── 5. MULTIBAND COMPRESSION ──────────────────────────────────────────────────
 
 def linkwitz_riley_crossover(audio: np.ndarray, sr: int, crossover_hz: float, order: int = 4):
-    """Split audio into low and high bands using LR crossover filters."""
+    """Split audio into low and high bands using LR crossover filters.
+    Uses lfilter (not filtfilt) to halve peak RAM – filtfilt needs 2× the
+    array size internally for the backward pass.
+    """
     nyq = sr / 2
-    norm_freq = crossover_hz / nyq
+    norm_freq = float(np.clip(crossover_hz / nyq, 0.01, 0.99))
 
-    if norm_freq >= 0.99:
-        norm_freq = 0.99
-    if norm_freq <= 0.01:
-        norm_freq = 0.01
-
-    # Butterworth 2nd order (cascade for LR 4th order)
-    b_low, a_low = scipy_signal.butter(order // 2, norm_freq, btype="low")
+    b_low,  a_low  = scipy_signal.butter(order // 2, norm_freq, btype="low")
     b_high, a_high = scipy_signal.butter(order // 2, norm_freq, btype="high")
 
     if audio.ndim == 2:
-        low  = np.stack([scipy_signal.filtfilt(b_low,  a_low,  ch) for ch in audio])
-        high = np.stack([scipy_signal.filtfilt(b_high, a_high, ch) for ch in audio])
+        low  = np.stack([scipy_signal.lfilter(b_low,  a_low,  ch).astype(np.float32) for ch in audio])
+        high = np.stack([scipy_signal.lfilter(b_high, a_high, ch).astype(np.float32) for ch in audio])
     else:
-        low  = scipy_signal.filtfilt(b_low,  a_low,  audio)
-        high = scipy_signal.filtfilt(b_high, a_high, audio)
+        low  = scipy_signal.lfilter(b_low,  a_low,  audio).astype(np.float32)
+        high = scipy_signal.lfilter(b_high, a_high, audio).astype(np.float32)
 
     return low, high
 
 
 def compress_band(audio: np.ndarray, sr: int, threshold_db: float, ratio: float,
                   attack_ms: float = 20, release_ms: float = 100) -> np.ndarray:
-    """Vectorized single-band compressor using scipy IIR envelope follower.
-    Replaces the previous Python sample-loop (which OOM-killed the process on
-    long tracks) with scipy.lfilter running in C — same result, 100× faster.
-    """
+    """Vectorized single-band compressor using scipy IIR envelope follower."""
     threshold = db_to_linear(threshold_db)
     attack_coeff  = np.exp(-1.0 / (sr * attack_ms  / 1000))
     release_coeff = np.exp(-1.0 / (sr * release_ms / 1000))
@@ -144,44 +138,51 @@ def compress_band(audio: np.ndarray, sr: int, threshold_db: float, ratio: float,
 
     level = np.abs(audio).astype(np.float32)
 
-    # --- Envelope follower via two IIR passes (attack + release) ---
-    # scipy.lfilter: y[n] = (1-c)*x[n] + c*y[n-1]
     b_att = np.array([1.0 - attack_coeff],  dtype=np.float64)
     a_att = np.array([1.0, -attack_coeff],  dtype=np.float64)
     b_rel = np.array([1.0 - release_coeff], dtype=np.float64)
     a_rel = np.array([1.0, -release_coeff], dtype=np.float64)
 
-    env_att = scipy_signal.lfilter(b_att, a_att, level)   # fast (attack)
-    env_rel = scipy_signal.lfilter(b_rel, a_rel, level)   # slow (release)
+    env_att = scipy_signal.lfilter(b_att, a_att, level).astype(np.float32)
+    env_rel = scipy_signal.lfilter(b_rel, a_rel, level).astype(np.float32)
+    del level
 
-    # Use attack envelope when signal is rising, release when falling
-    rising   = np.diff(level, prepend=level[0]) >= 0
+    rising   = np.diff(env_att, prepend=env_att[0]) >= 0
     envelope = np.where(rising, env_att, env_rel).astype(np.float32)
+    del env_att, env_rel, rising
 
-    # --- Gain computation (fully vectorized) ---
     gain = np.ones(len(envelope), dtype=np.float32)
     over = envelope > threshold
     if np.any(over):
         gain[over] = (threshold * (envelope[over] / threshold) ** (1.0 / ratio)
                       / envelope[over])
+    del envelope, over
 
-    return audio * gain
+    return (audio * gain).astype(np.float32)
 
 
 def apply_multiband_compression(audio: np.ndarray, sr: int, params: MasteringParams) -> np.ndarray:
-    """4-band multiband compression with LR crossovers."""
-    # Split into 4 bands
-    sub,  rest1  = linkwitz_riley_crossover(audio,  sr,    80)
-    low,  rest2  = linkwitz_riley_crossover(rest1,  sr,   500)
-    mid,  high   = linkwitz_riley_crossover(rest2,  sr,  5000)
+    """4-band multiband compression – frees intermediate arrays to keep RAM low."""
+    import gc
 
-    # Compress each band
-    sub_c  = compress_band(sub,  sr, params.mb_sub_threshold,  params.mb_sub_ratio,  params.mb_sub_attack, params.mb_sub_release)
-    low_c  = compress_band(low,  sr, params.mb_low_threshold,  params.mb_low_ratio,  30, 120)
-    mid_c  = compress_band(mid,  sr, params.mb_mid_threshold,  params.mb_mid_ratio,  15, 80)
-    high_c = compress_band(high, sr, params.mb_high_threshold, params.mb_high_ratio, 8,  40)
+    sub,  rest1 = linkwitz_riley_crossover(audio, sr, 80)
+    low,  rest2 = linkwitz_riley_crossover(rest1, sr, 500)
+    del rest1; gc.collect()
+    mid,  high  = linkwitz_riley_crossover(rest2, sr, 5000)
+    del rest2; gc.collect()
 
-    return sub_c + low_c + mid_c + high_c
+    sub_c = compress_band(sub, sr, params.mb_sub_threshold, params.mb_sub_ratio, params.mb_sub_attack, params.mb_sub_release)
+    del sub; gc.collect()
+    low_c = compress_band(low, sr, params.mb_low_threshold, params.mb_low_ratio, 30, 120)
+    del low; gc.collect()
+    mid_c = compress_band(mid, sr, params.mb_mid_threshold, params.mb_mid_ratio, 15, 80)
+    del mid; gc.collect()
+    high_c = compress_band(high, sr, params.mb_high_threshold, params.mb_high_ratio, 8, 40)
+    del high; gc.collect()
+
+    result = (sub_c + low_c + mid_c + high_c).astype(np.float32)
+    del sub_c, low_c, mid_c, high_c
+    return result
 
 
 # ─── 6. MID/SIDE PROCESSING ────────────────────────────────────────────────────
@@ -212,9 +213,9 @@ def apply_ms_processing(audio: np.ndarray, sr: int, params: MasteringParams) -> 
     # Mono below 120 Hz (cut side below 120Hz)
     nyq = sr / 2
     b, a = scipy_signal.butter(4, 120 / nyq, btype="low")
-    side_low = scipy_signal.filtfilt(b, a, side)
+    side_low = scipy_signal.lfilter(b, a, side)
     b_high, a_high = scipy_signal.butter(4, 120 / nyq, btype="high")
-    side_high = scipy_signal.filtfilt(b_high, a_high, side)
+    side_high = scipy_signal.lfilter(b_high, a_high, side)
     side = side_high  # Remove low-frequency side content
 
     left_out, right_out = decode_ms(mid, side)
@@ -241,14 +242,14 @@ def apply_saturation(audio: np.ndarray, sr: int, amount: float) -> np.ndarray:
     if audio.ndim == 2:
         result = np.zeros_like(audio)
         for i in range(2):
-            low_part  = scipy_signal.filtfilt(b_low,  a_low,  audio[i])
-            high_part = scipy_signal.filtfilt(b_high, a_high, audio[i])
+            low_part  = scipy_signal.lfilter(b_low,  a_low,  audio[i])
+            high_part = scipy_signal.lfilter(b_high, a_high, audio[i])
             saturated_low = soft_clip(low_part, drive=amount)
             result[i] = saturated_low + high_part
         return result
     else:
-        low_part  = scipy_signal.filtfilt(b_low,  a_low,  audio)
-        high_part = scipy_signal.filtfilt(b_high, a_high, audio)
+        low_part  = scipy_signal.lfilter(b_low,  a_low,  audio)
+        high_part = scipy_signal.lfilter(b_high, a_high, audio)
         return soft_clip(low_part, drive=amount) + high_part
 
 
