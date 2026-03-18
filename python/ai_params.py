@@ -171,6 +171,7 @@ def get_mastering_params(
             max_tokens=1024,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
+            timeout=10.0,  # fall back to defaults within 10s if API is slow
         )
 
         response_text = message.content[0].text.strip()

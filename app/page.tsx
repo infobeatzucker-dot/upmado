@@ -100,8 +100,9 @@ export default function Home() {
   const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
   const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
 
-  // Scroll target: back to top of panel on reset
-  const mainPanelRef = useRef<HTMLDivElement>(null);
+  // Scroll targets
+  const mainPanelRef     = useRef<HTMLDivElement>(null);   // for reset (scroll to top of panel)
+  const progressAnchorRef = useRef<HTMLDivElement>(null);  // for mastering start (scroll to progress)
 
   const scrollToPanel = useCallback(() => {
     setTimeout(() => {
@@ -109,9 +110,17 @@ export default function Home() {
     }, 50);
   }, []);
 
+  // Scroll to the progress section — called when mastering starts
+  // Uses a 300ms delay so React has time to render the progress panel first
+  const scrollToProgress = useCallback(() => {
+    setTimeout(() => {
+      progressAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+  }, []);
+
   const handleUploadComplete   = useCallback((file: UploadedFile) => { setUploadedFile(file); setAppState("uploaded"); }, []);
   const handleAnalysisComplete = useCallback((data: AnalysisData) => { setAnalysis(data); setAppState("analyzed"); }, []);
-  const handleMasteringStart   = useCallback(() => { setAppState("mastering"); setCurrentProgress({ step: "analyzing", label: "Analyzing track…", progress: 5 }); scrollToPanel(); }, [scrollToPanel]);
+  const handleMasteringStart   = useCallback(() => { setAppState("mastering"); setCurrentProgress({ step: "analyzing", label: "Analyzing track…", progress: 5 }); scrollToProgress(); }, [scrollToProgress]);
   const handleProgressUpdate   = useCallback((step: ProgressStep) => setCurrentProgress(step), []);
   const handleMasteringComplete = useCallback((data: MasterData) => { setMasterData(data); setAppState("done"); setCurrentProgress(null); }, []);
   const handleMasteringError   = useCallback(() => { setAppState("analyzed"); setCurrentProgress(null); }, []);
@@ -297,6 +306,9 @@ export default function Home() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Scroll anchor — always in DOM so progressAnchorRef is always set */}
+            <div ref={progressAnchorRef} />
 
             {/* Progress Display */}
             <AnimatePresence>

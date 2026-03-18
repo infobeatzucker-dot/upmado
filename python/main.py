@@ -146,22 +146,23 @@ async def master(req: MasterRequest):
             if req.analysis:
                 # Pre-analysis passed from frontend — skip expensive librosa re-run
                 analysis_dict = req.analysis
-                yield encode({"step": "analyzing", "progress": 15, "label": "Getting AI parameters…"})
             else:
                 # No pre-analysis — run full analysis (30–90s)
                 analysis_obj = await loop.run_in_executor(
                     None, analyze_audio, req.file_path
                 )
                 analysis_dict = analysis_to_dict(analysis_obj)
-                yield encode({"step": "analyzing", "progress": 15, "label": "Getting AI parameters…"})
 
-            # Get AI mastering params
+            # Yield before Claude API call so user sees progress move immediately
+            yield encode({"step": "eq", "progress": 18, "label": "Getting AI parameters…"})
+
+            # Get AI mastering params (Claude API, max 10s, falls back to defaults)
             params = await loop.run_in_executor(
                 None,
                 lambda: get_mastering_params(analysis_dict, req.platform, req.preset, req.intensity)
             )
 
-            yield encode({"step": "eq", "progress": 25, "label": "Applying EQ correction…"})
+            yield encode({"step": "eq", "progress": 28, "label": "Applying EQ correction…"})
 
             # Run mastering in thread pool without blocking event loop
             step_map = [
