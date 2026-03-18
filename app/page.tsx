@@ -124,7 +124,7 @@ export default function Home() {
             loop
             playsInline
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ opacity: 0.12, filter: "blur(1px) saturate(1.4)" }}
+            style={{ opacity: 0.22, filter: "blur(1px) saturate(1.4)" }}
           >
             <source src="/hero-bg.mp4" type="video/mp4" />
           </video>

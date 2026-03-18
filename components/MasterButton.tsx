@@ -121,7 +121,7 @@ export default function MasterButton({
 
   return (
     <div className="mt-6 flex flex-col items-center gap-4">
-      <div className="relative" ref={particleContainerRef}>
+      <div className="relative overflow-hidden rounded-2xl" ref={particleContainerRef}>
         <button
           onClick={handleClick}
           disabled={isProcessing}
