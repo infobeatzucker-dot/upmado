@@ -101,31 +101,63 @@ export default function Home() {
   const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
 
   // Scroll targets
-  const mainPanelRef     = useRef<HTMLDivElement>(null);   // for reset (scroll to top of panel)
-  const progressAnchorRef = useRef<HTMLDivElement>(null);  // for mastering start (scroll to progress)
+  const mainPanelRef      = useRef<HTMLDivElement>(null);   // for reset (scroll to top of panel)
+  const progressAnchorRef = useRef<HTMLDivElement>(null);   // for mastering start (scroll to progress)
+
+  // Guard: prevents stale handleMasteringComplete / handleMasteringError
+  // callbacks from updating state after a reset or remaster.
+  const isMasteringRef = useRef(false);
 
   const scrollToPanel = useCallback(() => {
     setTimeout(() => {
-      mainPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const el = mainPanelRef.current;
+      if (!el) return;
+      const y = el.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     }, 50);
   }, []);
 
-  // Scroll to the progress section — called when mastering starts
-  // Uses a 300ms delay so React has time to render the progress panel first
+  // Scroll to the progress section — wait 500 ms so React has rendered
+  // ProgressDisplay, then use explicit window.scrollTo (more reliable
+  // than scrollIntoView on a zero-height anchor div).
   const scrollToProgress = useCallback(() => {
     setTimeout(() => {
-      progressAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 300);
+      const el = progressAnchorRef.current;
+      if (!el) return;
+      const y = el.getBoundingClientRect().top + window.scrollY - 120;
+      window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+    }, 500);
   }, []);
 
   const handleUploadComplete   = useCallback((file: UploadedFile) => { setUploadedFile(file); setAppState("uploaded"); }, []);
   const handleAnalysisComplete = useCallback((data: AnalysisData) => { setAnalysis(data); setAppState("analyzed"); }, []);
-  const handleMasteringStart   = useCallback(() => { setAppState("mastering"); setCurrentProgress({ step: "analyzing", label: "Analyzing track…", progress: 5 }); scrollToProgress(); }, [scrollToProgress]);
-  const handleProgressUpdate   = useCallback((step: ProgressStep) => setCurrentProgress(step), []);
-  const handleMasteringComplete = useCallback((data: MasterData) => { setMasterData(data); setAppState("done"); setCurrentProgress(null); }, []);
-  const handleMasteringError   = useCallback(() => { setAppState("analyzed"); setCurrentProgress(null); }, []);
+
+  const handleMasteringStart = useCallback(() => {
+    isMasteringRef.current = true;
+    setAppState("mastering");
+    setCurrentProgress({ step: "analyzing", label: "Analyzing track…", progress: 5 });
+    scrollToProgress();
+  }, [scrollToProgress]);
+
+  const handleProgressUpdate = useCallback((step: ProgressStep) => setCurrentProgress(step), []);
+
+  const handleMasteringComplete = useCallback((data: MasterData) => {
+    if (!isMasteringRef.current) return; // stale callback after reset/remaster — ignore
+    isMasteringRef.current = false;
+    setMasterData(data);
+    setAppState("done");
+    setCurrentProgress(null);
+  }, []);
+
+  const handleMasteringError = useCallback(() => {
+    if (!isMasteringRef.current) return; // stale callback — ignore
+    isMasteringRef.current = false;
+    setAppState("analyzed");
+    setCurrentProgress(null);
+  }, []);
 
   const handleReset = useCallback(() => {
+    isMasteringRef.current = false; // cancel any in-flight mastering callbacks
     setAppState("idle");
     setUploadedFile(null);
     setAnalysis(null);
@@ -136,6 +168,7 @@ export default function Home() {
 
   // Remaster: keep file + analysis, just clear the master result
   const handleRemaster = useCallback(() => {
+    isMasteringRef.current = false; // cancel any in-flight mastering callbacks
     setMasterData(null);
     setCurrentProgress(null);
     setAppState("analyzed");

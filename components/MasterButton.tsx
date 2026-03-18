@@ -61,10 +61,14 @@ export default function MasterButton({
 
   const handleClick = async () => {
     if (isProcessing) return;
-    onStart();
 
+    // Create controller BEFORE calling onStart() so the ref is set
+    // before any state change (e.g. sticky popup unmounting) could
+    // trigger the old cleanup and abort an in-flight request.
     const controller = new AbortController();
     abortRef.current = controller;
+
+    onStart();
 
     try {
       const response = await fetch("/api/master", {
@@ -125,7 +129,11 @@ export default function MasterButton({
     return () => window.removeEventListener("keydown", onKey);
   }, [isProcessing]);
 
-  useEffect(() => { return () => abortRef.current?.abort(); }, []);
+  // NOTE: intentionally no unmount-abort cleanup here.
+  // The controller is stored in abortRef so it outlives this component
+  // instance (e.g. when the sticky popup unmounts after appState changes
+  // to "mastering"). An abort on unmount would cancel the in-flight SSE
+  // stream before Python has a chance to return results.
 
   return (
     <div className={`flex flex-col items-center gap-4 ${compact ? "" : "mt-6"}`}>
