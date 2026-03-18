@@ -3,6 +3,9 @@ import path from "path";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 
+// Allow up to 3 minutes – librosa analysis on long tracks can take 60–90s
+export const maxDuration = 180;
+
 const UPLOAD_DIR = process.env.TEMP_UPLOAD_DIR || "./uploads";
 const PYTHON_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:8001";
 
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file_path: filePath }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(120000), // 2 min – librosa BPM/key detection takes time
     });
 
     if (!res.ok) {
