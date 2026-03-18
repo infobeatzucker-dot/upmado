@@ -14,6 +14,7 @@ interface Props {
   onProgress: (step: ProgressStep) => void;
   onComplete: (data: MasterData) => void;
   onError: () => void;
+  compact?: boolean;          // compact layout for sticky popup (no hint text, smaller button)
 }
 
 const STEP_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ const STEP_LABELS: Record<string, string> = {
 export default function MasterButton({
   fileId, platform, preset, intensity, selectedFormat,
   isProcessing, onStart, onProgress, onComplete, onError,
+  compact = false,
 }: Props) {
   const particleContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -120,12 +122,12 @@ export default function MasterButton({
   useEffect(() => { return () => abortRef.current?.abort(); }, []);
 
   return (
-    <div className="mt-6 flex flex-col items-center gap-4">
-      <div className="relative overflow-hidden rounded-2xl" ref={particleContainerRef}>
+    <div className={`flex flex-col items-center gap-4 ${compact ? "" : "mt-6"}`}>
+      <div className="relative overflow-hidden rounded-2xl" ref={compact ? undefined : particleContainerRef}>
         <button
           onClick={handleClick}
           disabled={isProcessing}
-          className={`gradient-border relative px-12 py-4 rounded-2xl font-bold text-base tracking-wide transition-all duration-300
+          className={`gradient-border relative ${compact ? "px-8 py-3" : "px-12 py-4"} rounded-2xl font-bold text-base tracking-wide transition-all duration-300
             ${isProcessing ? "opacity-80 cursor-wait" : "hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"}`}
           style={{
             background: isProcessing
@@ -135,7 +137,7 @@ export default function MasterButton({
             boxShadow: isProcessing
               ? "0 0 40px rgba(124,111,255,0.4), 0 0 80px rgba(0,229,196,0.2)"
               : "0 0 20px rgba(124,111,255,0.3)",
-            minWidth: 240,
+            minWidth: compact ? 160 : 240,
           }}
         >
           {isProcessing ? (
@@ -147,16 +149,18 @@ export default function MasterButton({
           ) : (
             <span className="flex items-center gap-2 justify-center">
               ▶ MASTER NOW
-              <kbd className="text-xs px-1.5 py-0.5 rounded mono opacity-60"
-                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 10 }}>
-                M
-              </kbd>
+              {!compact && (
+                <kbd className="text-xs px-1.5 py-0.5 rounded mono opacity-60"
+                  style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.2)", fontSize: 10 }}>
+                  M
+                </kbd>
+              )}
             </span>
           )}
         </button>
       </div>
 
-      {!isProcessing && (
+      {!isProcessing && !compact && (
         <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
           Professionelle Mastering-Chain · KI-Parameterwahl · Format: <span style={{ color: "var(--accent-cyan)" }}>{selectedFormat.toUpperCase()}</span>
         </p>

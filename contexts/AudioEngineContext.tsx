@@ -63,6 +63,7 @@ export function AudioEngineProvider({
 }) {
   const audioRef       = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef    = useRef<AudioContext | null>(null);
+  const gainRef        = useRef<GainNode | null>(null);
   const rafRef         = useRef<number>(0);
 
   const [analyserMono, setAnalyserMono] = useState<AnalyserNode | null>(null);
@@ -195,6 +196,11 @@ export function AudioEngineProvider({
 
       const src = ctx.createMediaElementSource(audio);
 
+      // Master gain node – used to fade volume during A/B switch
+      const gain = ctx.createGain();
+      gain.gain.value = 1;
+      gainRef.current = gain;
+
       // Mono analyser (spectrum + waveform)
       const mono = ctx.createAnalyser();
       mono.fftSize = 2048;
@@ -209,11 +215,14 @@ export function AudioEngineProvider({
       aR.fftSize = 512;
       aR.smoothingTimeConstant = 0.8;
 
+      // Graph: src → mono → gain → destination
+      //        src → splitter → aL / aR  (for VU, no gain node needed)
       src.connect(mono);
       src.connect(splitter);
       splitter.connect(aL, 0);
       splitter.connect(aR, 1);
-      mono.connect(ctx.destination);
+      mono.connect(gain);
+      gain.connect(ctx.destination);
 
       setAnalyserMono(mono);
       setAnalyserL(aL);
@@ -233,31 +242,57 @@ export function AudioEngineProvider({
 
     const time       = audio.currentTime;
     const wasPlaying = isPlaying;
-    audio.pause();
 
-    const url = newMode === "A" ? originalUrl : masteredUrl;
-    if (!url) return;
+    const doSwitch = () => {
+      audio.pause();
 
-    audio.src = url;
-    audio.load();
+      const url = newMode === "A" ? originalUrl : masteredUrl;
+      if (!url) return;
 
-    audio.addEventListener("canplay", () => {
-      audio.currentTime = time;
-      if (wasPlaying) audio.play().catch(() => {});
-    }, { once: true });
+      audio.src = url;
+      audio.load();
 
-    audio.addEventListener("error", () => {
-      if (newMode === "B") {
-        setMasterUnavailable(true);
-        setModeState("A");
-        if (originalUrl) {
-          audio.src = originalUrl;
-          audio.load();
+      audio.addEventListener("canplay", () => {
+        audio.currentTime = time;
+        if (wasPlaying) {
+          audio.play().catch(() => {});
+          // Fade back in over 80 ms once the new source starts
+          const gain = gainRef.current;
+          const ctx  = audioCtxRef.current;
+          if (gain && ctx) {
+            gain.gain.cancelScheduledValues(ctx.currentTime);
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.08);
+          }
         }
-      }
-    }, { once: true });
+      }, { once: true });
 
-    setModeState(newMode);
+      audio.addEventListener("error", () => {
+        if (newMode === "B") {
+          setMasterUnavailable(true);
+          setModeState("A");
+          if (originalUrl) {
+            audio.src = originalUrl;
+            audio.load();
+          }
+        }
+      }, { once: true });
+
+      setModeState(newMode);
+    };
+
+    const gain = gainRef.current;
+    const ctx  = audioCtxRef.current;
+
+    if (gain && ctx && wasPlaying) {
+      // Fade out over 80 ms, then switch source
+      gain.gain.cancelScheduledValues(ctx.currentTime);
+      gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.08);
+      setTimeout(doSwitch, 90);
+    } else {
+      doSwitch();
+    }
   }, [originalUrl, masteredUrl, masterUnavailable, isPlaying]);
 
   // ── Playback controls ────────────────────────────────────────────────────────

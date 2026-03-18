@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/Header";
 import UploadZone from "@/components/UploadZone";
@@ -78,6 +78,16 @@ export interface ProgressStep {
   progress: number;
 }
 
+const FORMAT_OPTIONS = [
+  { key: "mp3128",  label: "MP3 128",    tier: "free", desc: "kostenlos" },
+  { key: "mp3320",  label: "MP3 320",    tier: "paid", desc: "Premium" },
+  { key: "wav16",   label: "WAV 16-bit", tier: "paid", desc: "CD-Qualität" },
+  { key: "wav24",   label: "WAV 24-bit", tier: "paid", desc: "Studio" },
+  { key: "flac",    label: "FLAC",       tier: "paid", desc: "Lossless" },
+  { key: "aac256",  label: "AAC 256",    tier: "paid", desc: "Streaming" },
+  { key: "wav32",   label: "WAV 32-bit", tier: "pro",  desc: "Pro" },
+] as const;
+
 export default function Home() {
   const [appState,         setAppState]         = useState<AppState>("idle");
   const [uploadedFile,     setUploadedFile]     = useState<UploadedFile | null>(null);
@@ -88,8 +98,16 @@ export default function Home() {
   const [intensity,        setIntensity]        = useState<number>(65);
   const [currentProgress,  setCurrentProgress]  = useState<ProgressStep | null>(null);
   const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
-  // Reference track (null = no reference)
   const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
+
+  // Scroll target: back to top of panel on reset
+  const mainPanelRef = useRef<HTMLDivElement>(null);
+
+  const scrollToPanel = useCallback(() => {
+    setTimeout(() => {
+      mainPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }, []);
 
   const handleUploadComplete   = useCallback((file: UploadedFile) => { setUploadedFile(file); setAppState("uploaded"); }, []);
   const handleAnalysisComplete = useCallback((data: AnalysisData) => { setAnalysis(data); setAppState("analyzed"); }, []);
@@ -104,7 +122,16 @@ export default function Home() {
     setAnalysis(null);
     setMasterData(null);
     setCurrentProgress(null);
-  }, []);
+    scrollToPanel();
+  }, [scrollToPanel]);
+
+  // Remaster: keep file + analysis, just clear the master result
+  const handleRemaster = useCallback(() => {
+    setMasterData(null);
+    setCurrentProgress(null);
+    setAppState("analyzed");
+    scrollToPanel();
+  }, [scrollToPanel]);
 
   // Audio engine URLs
   const originalUrl = uploadedFile ? `/api/preview?file_id=${uploadedFile.file_id}` : "";
@@ -117,21 +144,21 @@ export default function Home() {
       {/* Hero */}
       <section className="relative pt-24 pb-8 px-4 text-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          {/* Video background */}
+          {/* Video background — objectPosition: top to avoid top-clipping */}
           <video
             autoPlay
             muted
             loop
             playsInline
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ opacity: 0.22, filter: "blur(1px) saturate(1.4)" }}
+            style={{ opacity: 0.28, filter: "blur(1px) saturate(1.4)", objectPosition: "top center" }}
           >
             <source src="/hero-bg.mp4" type="video/mp4" />
           </video>
-          {/* Dark overlay so text stays readable */}
+          {/* Dark overlay */}
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(to bottom, rgba(8,10,18,0.4) 0%, rgba(8,10,18,0.1) 50%, rgba(8,10,18,0.7) 100%)" }}
+            style={{ background: "linear-gradient(to bottom, rgba(8,10,18,0.3) 0%, rgba(8,10,18,0.05) 50%, rgba(8,10,18,0.7) 100%)" }}
           />
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full"
@@ -173,7 +200,7 @@ export default function Home() {
       </section>
 
       {/* Main Mastering Interface */}
-      <main className="max-w-6xl mx-auto px-4 pb-16">
+      <main className="max-w-6xl mx-auto px-4 pb-32" ref={mainPanelRef}>
         <AudioEngineProvider originalUrl={originalUrl} masteredUrl={masteredUrl}>
           <div
             className="glass-panel-elevated p-6 md:p-8 relative"
@@ -183,10 +210,31 @@ export default function Home() {
                 : "0 4px 40px rgba(0,0,0,0.4)",
             }}
           >
-            {/* Panel header row */}
+            {/* Panel header row — Platform + Preset + optional "Neue Datei" link */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <PlatformTargets value={platform} onChange={setPlatform} />
-              <PresetSelector  value={preset}   onChange={setPreset} />
+              <div className="flex flex-col gap-1">
+                <PresetSelector value={preset} onChange={setPreset} />
+                {/* "Neue Datei" appears under preset when a file is loaded */}
+                <AnimatePresence>
+                  {appState !== "idle" && (
+                    <motion.button
+                      key="neue-datei-top"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      onClick={handleReset}
+                      className="text-xs flex items-center gap-1 hover:opacity-80 transition-opacity self-end pt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                      </svg>
+                      Neue Datei
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Intensity + Reference Track row */}
@@ -264,82 +312,23 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* Format selector + Master Button */}
+            {/* Inline format picker — only shown while mastering (progress reference) */}
             <AnimatePresence>
-              {(appState === "analyzed" || appState === "mastering") && uploadedFile && (
+              {appState === "mastering" && uploadedFile && (
                 <motion.div
-                  key="masterBtn"
+                  key="masteringBtn"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {/* Export format picker */}
-                  {appState === "analyzed" && (
-                    <div className="mt-4 mb-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="label" style={{ color: "var(--text-muted)" }}>Export-Format wählen</div>
-                        <button
-                          onClick={handleReset}
-                          className="text-xs flex items-center gap-1 hover:opacity-80 transition-opacity"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
-                          </svg>
-                          Neue Datei
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {([
-                          { key: "mp3128",  label: "MP3 128",    tier: "free", desc: "kostenlos" },
-                          { key: "mp3320",  label: "MP3 320",    tier: "paid", desc: "Premium" },
-                          { key: "wav16",   label: "WAV 16-bit", tier: "paid", desc: "CD-Qualität" },
-                          { key: "wav24",   label: "WAV 24-bit", tier: "paid", desc: "Studio" },
-                          { key: "flac",    label: "FLAC",       tier: "paid", desc: "Lossless" },
-                          { key: "aac256",  label: "AAC 256",    tier: "paid", desc: "Streaming" },
-                          { key: "wav32",   label: "WAV 32-bit", tier: "pro",  desc: "Pro" },
-                        ] as const).map((fmt) => {
-                          const active = selectedFormat === fmt.key;
-                          const isFree = fmt.tier === "free";
-                          const isPro  = fmt.tier === "pro";
-                          return (
-                            <button
-                              key={fmt.key}
-                              onClick={() => setSelectedFormat(fmt.key)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                              style={{
-                                background: active
-                                  ? "linear-gradient(135deg, rgba(124,111,255,0.25), rgba(0,229,196,0.15))"
-                                  : "rgba(255,255,255,0.04)",
-                                border: active
-                                  ? "1px solid rgba(124,111,255,0.5)"
-                                  : "1px solid rgba(255,255,255,0.08)",
-                                color: active ? "var(--accent-purple)" : "var(--text-muted)",
-                                boxShadow: active ? "0 0 12px rgba(124,111,255,0.2)" : "none",
-                              }}
-                            >
-                              {fmt.label}
-                              {isFree && (
-                                <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(0,229,196,0.15)", color: "var(--accent-cyan)" }}>FREE</span>
-                              )}
-                              {isPro && (
-                                <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(245,200,66,0.15)", color: "var(--accent-gold)" }}>PRO</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   <MasterButton
                     fileId={uploadedFile.file_id}
                     platform={platform}
                     preset={preset}
                     intensity={intensity}
                     selectedFormat={selectedFormat}
-                    isProcessing={appState === "mastering"}
+                    isProcessing={true}
                     onStart={handleMasteringStart}
                     onProgress={handleProgressUpdate}
                     onComplete={handleMasteringComplete}
@@ -367,6 +356,7 @@ export default function Home() {
                     intensity={intensity}
                     preAnalysis={analysis!}
                     onReset={handleReset}
+                    onRemaster={handleRemaster}
                   />
                 </motion.div>
               )}
@@ -374,6 +364,75 @@ export default function Home() {
           </div>
         </AudioEngineProvider>
       </main>
+
+      {/* ── Sticky bottom "Master NOW" popup ───────────────────────────────────── */}
+      <AnimatePresence>
+        {appState === "analyzed" && uploadedFile && (
+          <motion.div
+            key="master-popup"
+            initial={{ y: 120, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 120, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 280, damping: 28 }}
+            className="fixed bottom-0 left-0 right-0 z-50"
+            style={{
+              background: "rgba(8,10,18,0.97)",
+              backdropFilter: "blur(24px)",
+              borderTop: "1px solid rgba(124,111,255,0.2)",
+              boxShadow: "0 -8px 40px rgba(0,0,0,0.6), 0 -1px 0 rgba(124,111,255,0.08)",
+            }}
+          >
+            <div className="max-w-6xl mx-auto px-4 py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Format pills */}
+                <div className="flex flex-wrap gap-1.5 flex-1">
+                  {FORMAT_OPTIONS.map((fmt) => {
+                    const active = selectedFormat === fmt.key;
+                    const isFree = fmt.tier === "free";
+                    const isPro  = fmt.tier === "pro";
+                    return (
+                      <button
+                        key={fmt.key}
+                        onClick={() => setSelectedFormat(fmt.key)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                          background: active
+                            ? "linear-gradient(135deg, rgba(124,111,255,0.25), rgba(0,229,196,0.15))"
+                            : "rgba(255,255,255,0.04)",
+                          border: active
+                            ? "1px solid rgba(124,111,255,0.5)"
+                            : "1px solid rgba(255,255,255,0.08)",
+                          color: active ? "var(--accent-purple)" : "var(--text-muted)",
+                          boxShadow: active ? "0 0 10px rgba(124,111,255,0.2)" : "none",
+                        }}
+                      >
+                        {fmt.label}
+                        {isFree && <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(0,229,196,0.15)", color: "var(--accent-cyan)" }}>FREE</span>}
+                        {isPro  && <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(245,200,66,0.15)", color: "var(--accent-gold)" }}>PRO</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Master NOW button */}
+                <MasterButton
+                  fileId={uploadedFile.file_id}
+                  platform={platform}
+                  preset={preset}
+                  intensity={intensity}
+                  selectedFormat={selectedFormat}
+                  isProcessing={false}
+                  onStart={handleMasteringStart}
+                  onProgress={handleProgressUpdate}
+                  onComplete={handleMasteringComplete}
+                  onError={handleMasteringError}
+                  compact
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <FeaturesSection />
       <PricingSection />

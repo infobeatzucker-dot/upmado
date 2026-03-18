@@ -20,6 +20,7 @@ interface Props {
   intensity:   number;
   preAnalysis: import("@/app/page").AnalysisData;
   onReset:     () => void;
+  onRemaster?: () => void;  // Keep file + analysis, go back to preset selection
 }
 
 const FORMAT_CONFIG = [
@@ -34,9 +35,15 @@ const FORMAT_CONFIG = [
 
 type FormatKey = keyof MasterData["formats"];
 
-export default function DownloadPanel({ masterData, fileId, filename, platform, preset, intensity, preAnalysis, onReset }: Props) {
+export default function DownloadPanel({ masterData, fileId, filename, platform, preset, intensity, preAnalysis, onReset, onRemaster }: Props) {
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const [showPayPal,    setShowPayPal]    = useState(false);
+
+  // Build clean base name: strip extension + sanitize for filename
+  const cleanName = filename
+    .replace(/\.[^/.]+$/, "")               // remove extension
+    .replace(/[^a-zA-Z0-9_\-]/g, "_")      // replace special chars
+    .toLowerCase();
 
   const openReport = () => {
     const payload = {
@@ -53,11 +60,12 @@ export default function DownloadPanel({ masterData, fileId, filename, platform, 
     window.open(`/api/report?data=${b64}`, "_blank");
   };
 
-  const handleDownload = (format: string, url: string) => {
+  // fmtKey = "mp3128", ext = "mp3"  →  upmado_trackname_mp3128.mp3
+  const handleDownload = (fmtKey: string, ext: string, url: string) => {
     const finalUrl = downloadToken ? `${url}&token=${downloadToken}` : url;
     const a = document.createElement("a");
     a.href = finalUrl;
-    a.download = `master_${masterData.master_id}.${format}`;
+    a.download = `upmado_${cleanName}_${fmtKey}.${ext}`;
     a.click();
   };
 
@@ -128,7 +136,7 @@ export default function DownloadPanel({ masterData, fileId, filename, platform, 
           return (
             <button
               key={fmt.key}
-              onClick={() => !isLocked && url && handleDownload(fmt.ext, url)}
+              onClick={() => !isLocked && url && handleDownload(fmt.key, fmt.ext, url)}
               disabled={isLocked}
               className="flex items-center justify-between p-3 rounded-xl transition-all text-left"
               style={{
@@ -246,26 +254,52 @@ export default function DownloadPanel({ masterData, fileId, filename, platform, 
         </div>
       )}
 
-      {/* New Master CTA */}
-      <motion.button
-        onClick={onReset}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
-        style={{
-          background: "rgba(124,111,255,0.08)",
-          border: "1px solid rgba(124,111,255,0.25)",
-          color: "var(--accent-purple)",
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round" stroke="var(--accent-purple)">
-          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-          <path d="M3 3v5h5"/>
-        </svg>
-        Neuen Master erstellen
-      </motion.button>
+      {/* Action buttons row */}
+      <div className={`mt-6 flex gap-3 ${onRemaster ? "flex-col sm:flex-row" : ""}`}>
+        {/* Remaster – keep file, change params */}
+        {onRemaster && (
+          <motion.button
+            onClick={onRemaster}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
+            style={{
+              background: "rgba(0,229,196,0.07)",
+              border: "1px solid rgba(0,229,196,0.25)",
+              color: "var(--accent-cyan)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"
+              strokeLinecap="round" strokeLinejoin="round" stroke="var(--accent-cyan)">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Remaster (neue Parameter)
+          </motion.button>
+        )}
+
+        {/* New Master – full reset */}
+        <motion.button
+          onClick={onReset}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className={`${onRemaster ? "flex-1" : "w-full"} flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold`}
+          style={{
+            background: "rgba(124,111,255,0.08)",
+            border: "1px solid rgba(124,111,255,0.25)",
+            color: "var(--accent-purple)",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round" stroke="var(--accent-purple)">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+          </svg>
+          Neuen Master erstellen
+        </motion.button>
+      </div>
     </div>
   );
 }
