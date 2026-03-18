@@ -277,7 +277,19 @@ export default function Home() {
                   {/* Export format picker */}
                   {appState === "analyzed" && (
                     <div className="mt-4 mb-1">
-                      <div className="label mb-2" style={{ color: "var(--text-muted)" }}>Export-Format wählen</div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="label" style={{ color: "var(--text-muted)" }}>Export-Format wählen</div>
+                        <button
+                          onClick={handleReset}
+                          className="text-xs flex items-center gap-1 hover:opacity-80 transition-opacity"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                          </svg>
+                          Neue Datei
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {([
                           { key: "mp3128",  label: "MP3 128",    tier: "free", desc: "kostenlos" },
