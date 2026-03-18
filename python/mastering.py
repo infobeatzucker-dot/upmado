@@ -252,8 +252,8 @@ def apply_saturation(audio: np.ndarray, sr: int, amount: float) -> np.ndarray:
     if amount < 0.01:
         return audio
 
-    # 2× upsample before nonlinearity
-    audio_up = scipy_signal.resample_poly(audio, 2, 1).astype(np.float32)
+    # 2× upsample before nonlinearity (axis=-1 = time axis for [ch, samples] arrays)
+    audio_up = scipy_signal.resample_poly(audio, 2, 1, axis=-1).astype(np.float32)
     nyq_up   = sr  # Nyquist at 2× original sr
 
     sos_low  = scipy_signal.butter(4, 5000 / nyq_up, btype="low",  output="sos")
@@ -271,7 +271,7 @@ def apply_saturation(audio: np.ndarray, sr: int, amount: float) -> np.ndarray:
         result = (soft_clip(low_part, drive=amount) + high_part).astype(np.float32)
 
     # 2× downsample — resample_poly includes built-in anti-aliasing FIR
-    result = scipy_signal.resample_poly(result, 1, 2).astype(np.float32)
+    result = scipy_signal.resample_poly(result, 1, 2, axis=-1).astype(np.float32)
     # Trim to original length (resample_poly may produce ±1 sample)
     if audio.ndim == 2:
         result = result[:, :audio.shape[1]]
