@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/Header";
 import UploadZone from "@/components/UploadZone";
@@ -17,7 +17,38 @@ import PricingSection from "@/components/PricingSection";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 import MasteringProgressModal from "@/components/MasteringProgressModal";
-import { AudioEngineProvider } from "@/contexts/AudioEngineContext";
+import { AudioEngineProvider, useAudioEngine } from "@/contexts/AudioEngineContext";
+
+// ── Auto-play master after mastering completes ─────────────────────────────────
+// Must live inside AudioEngineProvider so it can access the audio engine hook.
+function MasterPlayTrigger({ shouldPlay, downloadRef }: {
+  shouldPlay: boolean;
+  downloadRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const engine = useAudioEngine();
+  const didTrigger = useRef(false);
+
+  useEffect(() => {
+    if (!shouldPlay) { didTrigger.current = false; return; }
+    if (didTrigger.current || !engine?.masteredUrl) return;
+    didTrigger.current = true;
+
+    // Scroll to download/player panel
+    setTimeout(() => {
+      const el = downloadRef.current;
+      if (el) {
+        const y = el.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+      }
+    }, 400);
+
+    // Switch to master + attempt autoplay (700ms delay for panel animation)
+    setTimeout(() => engine.playMaster(), 700);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldPlay, engine?.masteredUrl]);
+
+  return null;
+}
 
 export type AppState = "idle" | "uploaded" | "analyzing" | "analyzed" | "mastering" | "done";
 export type Platform  = "spotify" | "apple" | "youtube" | "club" | "tidal" | "amazon" | "deezer" | "tiktok" | "soundcloud" | "broadcast" | "custom";
@@ -100,8 +131,9 @@ export default function Home() {
   const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
   const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
 
-  // Scroll target for reset
-  const mainPanelRef = useRef<HTMLDivElement>(null);
+  // Scroll targets
+  const mainPanelRef  = useRef<HTMLDivElement>(null);
+  const downloadRef   = useRef<HTMLDivElement>(null);  // scroll-to after mastering
 
   // Guard: prevents stale handleMasteringComplete / handleMasteringError
   // callbacks from updating state after a reset or remaster.
@@ -330,6 +362,8 @@ export default function Home() {
             {/* Mastering progress is shown in a modal overlay — see MasteringProgressModal below */}
 
             {/* Download Panel — includes A/B player with master */}
+            {/* downloadRef marks the scroll target for auto-scroll after mastering */}
+            <div ref={downloadRef} />
             <AnimatePresence>
               {appState === "done" && masterData && (
                 <motion.div
@@ -352,6 +386,12 @@ export default function Home() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Auto-play master + scroll after mastering completes */}
+            <MasterPlayTrigger
+              shouldPlay={appState === "done"}
+              downloadRef={downloadRef}
+            />
           </div>
         </AudioEngineProvider>
       </main>

@@ -9,6 +9,7 @@ import librosa
 import pyloudnorm as pyln
 from pedalboard import Pedalboard, HighpassFilter, LowShelfFilter, HighShelfFilter, PeakFilter, Distortion, Gain
 from scipy import signal as scipy_signal
+from scipy.ndimage import maximum_filter1d
 import os
 import uuid
 from dataclasses import dataclass
@@ -171,13 +172,24 @@ def apply_multiband_compression(audio: np.ndarray, sr: int, params: MasteringPar
     mid,  high  = linkwitz_riley_crossover(rest2, sr, 5000)
     del rest2; gc.collect()
 
+    # Use params for sub (fully parametric).
+    # Low/Mid/High: derive attack from AI ratio — tighter ratio → faster attack
+    # so transients are preserved more on gentler settings.
+    def _band_atk(base_ms: float, ratio: float) -> float:
+        return max(5.0, base_ms * (2.0 / max(ratio, 1.0)))
+    def _band_rel(base_ms: float, ratio: float) -> float:
+        return max(40.0, base_ms * (2.0 / max(ratio, 1.0)))
+
     sub_c = compress_band(sub, sr, params.mb_sub_threshold, params.mb_sub_ratio, params.mb_sub_attack, params.mb_sub_release)
     del sub; gc.collect()
-    low_c = compress_band(low, sr, params.mb_low_threshold, params.mb_low_ratio, 30, 120)
+    low_c = compress_band(low, sr, params.mb_low_threshold, params.mb_low_ratio,
+                          _band_atk(30, params.mb_low_ratio), _band_rel(120, params.mb_low_ratio))
     del low; gc.collect()
-    mid_c = compress_band(mid, sr, params.mb_mid_threshold, params.mb_mid_ratio, 15, 80)
+    mid_c = compress_band(mid, sr, params.mb_mid_threshold, params.mb_mid_ratio,
+                          _band_atk(15, params.mb_mid_ratio), _band_rel(80, params.mb_mid_ratio))
     del mid; gc.collect()
-    high_c = compress_band(high, sr, params.mb_high_threshold, params.mb_high_ratio, 8, 40)
+    high_c = compress_band(high, sr, params.mb_high_threshold, params.mb_high_ratio,
+                           _band_atk(8, params.mb_high_ratio), _band_rel(40, params.mb_high_ratio))
     del high; gc.collect()
 
     result = (sub_c + low_c + mid_c + high_c).astype(np.float32)
@@ -263,47 +275,61 @@ def apply_bus_compression(audio: np.ndarray, sr: int, params: MasteringParams) -
 # ─── 11. LIMITING ──────────────────────────────────────────────────────────────
 
 def apply_true_peak_limiter(audio: np.ndarray, sr: int, ceiling_db: float, target_lufs: float) -> np.ndarray:
-    """Gain + True Peak ceiling + LUFS normalization."""
-    # First, LUFS normalization
-    meter = pyln.Meter(sr)
-    if audio.ndim == 2:
-        lufs_in = audio.T
-    else:
-        lufs_in = audio.reshape(-1, 1)
+    """
+    True Peak limiter with proper lookahead + smooth attack/release.
 
+    Pipeline:
+      1. LUFS normalization (ITU-R BS.1770-4 via pyloudnorm)
+      2. 5 ms forward-looking peak detection (scipy maximum_filter1d)
+      3. Smooth gain reduction: instant attack, 50 ms release (IIR)
+      4. Hard safety clip as final guard
+    """
+    # ── 1. LUFS normalization ────────────────────────────────────────────────
+    meter = pyln.Meter(sr)
+    lufs_in = audio.T if audio.ndim == 2 else audio.reshape(-1, 1)
     current_lufs = meter.integrated_loudness(lufs_in)
     if np.isfinite(current_lufs):
-        gain_db = target_lufs - current_lufs
-        gain_lin = db_to_linear(gain_db)
-        audio = audio * gain_lin
+        audio = audio * db_to_linear(target_lufs - current_lufs)
 
-    # Hard True Peak ceiling
     ceiling_lin = db_to_linear(ceiling_db)
-    peak = np.max(np.abs(audio))
-    if peak > ceiling_lin:
-        audio = audio * (ceiling_lin / peak)
 
-    # Lookahead limiting: simple lookahead peak limiter
-    lookahead_samples = int(sr * 0.005)  # 5ms
+    # ── 2. Compute per-sample peak (max of L/R channels) ────────────────────
     if audio.ndim == 2:
-        combined = np.max(np.abs(audio), axis=0)
+        peak_sig = np.max(np.abs(audio), axis=0).astype(np.float32)
     else:
-        combined = np.abs(audio)
+        peak_sig = np.abs(audio).astype(np.float32)
 
-    gain = np.ones(len(combined))
-    for i in range(lookahead_samples, len(combined)):
-        peak_ahead = np.max(combined[i - lookahead_samples:i + 1])
-        if peak_ahead > ceiling_lin:
-            gain[i - lookahead_samples:i + 1] = np.minimum(
-                gain[i - lookahead_samples:i + 1],
-                ceiling_lin / peak_ahead
-            )
+    # ── 3. 5 ms forward lookahead with scipy (O(n), no Python loop) ─────────
+    lookahead = max(1, int(sr * 0.005))  # 5 ms in samples
+    # maximum_filter1d with a left-shifted origin sees future samples
+    peak_ahead = maximum_filter1d(peak_sig, size=lookahead + 1, origin=-(lookahead // 2))
 
+    # Desired gain at each sample (≤ 1.0)
+    desired_gain = np.where(
+        peak_ahead > ceiling_lin,
+        ceiling_lin / np.maximum(peak_ahead, 1e-8),
+        1.0,
+    ).astype(np.float32)
+
+    # ── 4. Smooth gain with instant attack + 50 ms release (IIR) ────────────
+    release_coeff = float(np.exp(-1.0 / (sr * 0.05)))  # τ = 50 ms
+    smoothed = np.empty_like(desired_gain)
+    g = 1.0
+    for i in range(len(desired_gain)):
+        d = desired_gain[i]
+        if d < g:
+            g = d                                           # Instant attack
+        else:
+            g = release_coeff * g + (1.0 - release_coeff) * d  # Smooth release
+        smoothed[i] = g
+
+    # ── 5. Apply gain + hard safety clip ────────────────────────────────────
     if audio.ndim == 2:
-        audio = audio * gain
+        audio = (audio * smoothed).astype(np.float32)
     else:
-        audio = audio * gain
+        audio = (audio * smoothed).astype(np.float32)
 
+    np.clip(audio, -ceiling_lin, ceiling_lin, out=audio)
     return audio
 
 

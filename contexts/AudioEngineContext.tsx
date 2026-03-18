@@ -38,6 +38,7 @@ export interface AudioEngineContextType {
   setMode: (m: "A" | "B") => void;
   togglePlay: () => void;
   seek: (t: number) => void;
+  playMaster: () => void;   // Switch to B + attempt autoplay from start
 
   // Current URLs (for display)
   originalUrl: string;
@@ -314,6 +315,32 @@ export function AudioEngineProvider({
     setCurrentTime(t);
   }, []);
 
+  // Switch to master (B) and attempt autoplay from the start.
+  // Called automatically after mastering completes.
+  const playMaster = useCallback(() => {
+    if (!masteredUrl) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    setModeState("B");
+    audio.src = masteredUrl;
+    audio.load();
+
+    audio.addEventListener("canplay", () => {
+      audio.currentTime = 0;
+      initAudioContext();
+      audio.play().catch(() => {
+        // Browser blocked autoplay — user can press play manually
+      });
+    }, { once: true });
+
+    audio.addEventListener("error", () => {
+      setMasterUnavailable(true);
+      setModeState("A");
+      if (originalUrl) { audio.src = originalUrl; audio.load(); }
+    }, { once: true });
+  }, [masteredUrl, originalUrl, initAudioContext]);
+
   return (
     <AudioEngineContext.Provider
       value={{
@@ -328,6 +355,7 @@ export function AudioEngineProvider({
         setMode,
         togglePlay,
         seek,
+        playMaster,
         originalUrl,
         masteredUrl,
         staticWaveform,
