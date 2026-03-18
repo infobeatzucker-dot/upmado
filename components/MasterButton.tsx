@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Platform, Preset, MasterData, ProgressStep } from "@/app/page";
+import { Platform, Preset, MasterData, ProgressStep, AnalysisData } from "@/app/page";
 
 interface Props {
   fileId: string;
@@ -9,6 +9,7 @@ interface Props {
   preset: Preset;
   intensity: number;          // 0–100
   selectedFormat: string;
+  analysis?: AnalysisData;    // pre-computed analysis — passed to Python to skip librosa re-run
   isProcessing: boolean;
   onStart: () => void;
   onProgress: (step: ProgressStep) => void;
@@ -30,6 +31,7 @@ const STEP_LABELS: Record<string, string> = {
 
 export default function MasterButton({
   fileId, platform, preset, intensity, selectedFormat,
+  analysis,
   isProcessing, onStart, onProgress, onComplete, onError,
   compact = false,
 }: Props) {
@@ -63,10 +65,14 @@ export default function MasterButton({
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const url = `/api/master?file_id=${fileId}&platform=${platform}&preset=${preset}&intensity=${intensity}&format=${selectedFormat}`;
 
     try {
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch("/api/master", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId, platform, preset, intensity, format: selectedFormat, analysis }),
+        signal: controller.signal,
+      });
       if (!response.ok || !response.body) { onError(); return; }
 
       const reader  = response.body.getReader();

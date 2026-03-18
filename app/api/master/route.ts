@@ -4,6 +4,9 @@ import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 import { randomUUID } from "crypto";
 
+// Allow up to 10 minutes – mastering a full track can take 3–5 min
+export const maxDuration = 600;
+
 const UPLOAD_DIR = process.env.TEMP_UPLOAD_DIR || "./uploads";
 const PYTHON_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:8001";
 
@@ -12,13 +15,14 @@ function encodeSSE(data: object) {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const fileId = searchParams.get("file_id");
-  const platform = searchParams.get("platform") || "spotify";
-  const preset = searchParams.get("preset") || "auto";
-  const intensity = parseInt(searchParams.get("intensity") || "65", 10);
-  const format = searchParams.get("format") || "mp3128";
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const fileId    = body.file_id    as string | undefined;
+  const platform  = (body.platform  as string) || "spotify";
+  const preset    = (body.preset    as string) || "auto";
+  const intensity = Number(body.intensity ?? 65);
+  const format    = (body.format    as string) || "mp3128";
+  const analysis  = body.analysis   as object | undefined;  // pre-computed analysis from /api/analyze
 
   if (!fileId) {
     return new Response("file_id required", { status: 400 });
@@ -48,6 +52,7 @@ export async function GET(req: NextRequest) {
         send({ step: "analyzing", label: "Analyzing track…", progress: 5 });
 
         // Call Python mastering with progress streaming
+        // Pass pre-analysis so Python can skip the expensive librosa re-run
         const res = await fetch(`${PYTHON_URL}/master`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -58,8 +63,9 @@ export async function GET(req: NextRequest) {
             intensity,
             format,
             output_dir: path.resolve(path.join(UPLOAD_DIR, "masters")),
+            ...(analysis ? { analysis } : {}),
           }),
-          signal: AbortSignal.timeout(300000), // 5 min timeout
+          signal: AbortSignal.timeout(540000), // 9 min timeout
         });
 
         if (!res.ok || !res.body) {

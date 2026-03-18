@@ -8,6 +8,7 @@ import json
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -78,6 +79,7 @@ class MasterRequest(BaseModel):
     intensity: int = 65
     format: str = "mp3128"
     output_dir: str = "./uploads/masters"
+    analysis: Optional[dict] = None  # pre-computed analysis from /analyze — skips librosa re-run
 
 
 # ─── Routes ────────────────────────────────────────────────────────────────────
@@ -139,14 +141,19 @@ async def master(req: MasterRequest):
         try:
             yield encode({"step": "analyzing", "progress": 5, "label": "Analyzing track…"})
 
-            # Run analysis
             loop = asyncio.get_event_loop()
-            analysis = await loop.run_in_executor(
-                None, analyze_audio, req.file_path
-            )
-            analysis_dict = analysis_to_dict(analysis)
 
-            yield encode({"step": "analyzing", "progress": 15, "label": "Getting AI parameters…"})
+            if req.analysis:
+                # Pre-analysis passed from frontend — skip expensive librosa re-run
+                analysis_dict = req.analysis
+                yield encode({"step": "analyzing", "progress": 15, "label": "Getting AI parameters…"})
+            else:
+                # No pre-analysis — run full analysis (30–90s)
+                analysis_obj = await loop.run_in_executor(
+                    None, analyze_audio, req.file_path
+                )
+                analysis_dict = analysis_to_dict(analysis_obj)
+                yield encode({"step": "analyzing", "progress": 15, "label": "Getting AI parameters…"})
 
             # Get AI mastering params
             params = await loop.run_in_executor(
@@ -169,7 +176,6 @@ async def master(req: MasterRequest):
             render_label = f"Rendering {req.format.upper()}…"
             step_map[-1] = ("rendering", 94, render_label)
 
-            loop = asyncio.get_event_loop()
             mastering_task = loop.run_in_executor(
                 None, master_audio, req.file_path, params, req.output_dir, None, req.format, analysis_dict
             )
