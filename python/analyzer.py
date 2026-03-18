@@ -65,8 +65,9 @@ def rms_band(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float
     if low >= high:
         return -80.0
 
-    b, a = scipy_signal.butter(4, [low, high], btype="bandpass")
-    filtered = scipy_signal.lfilter(b, a, chunk)  # lfilter: half the RAM of filtfilt
+    # sosfilt = numerically stable SOS form, single-pass (low RAM), no overflow
+    sos = scipy_signal.butter(4, [low, high], btype="bandpass", output="sos")
+    filtered = scipy_signal.sosfilt(sos, chunk)
     rms = np.sqrt(np.mean(filtered ** 2))
 
     if rms < 1e-10:
