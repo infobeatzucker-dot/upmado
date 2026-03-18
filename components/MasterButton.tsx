@@ -9,7 +9,8 @@ interface Props {
   preset: Preset;
   intensity: number;          // 0–100
   selectedFormat: string;
-  analysis?: AnalysisData;    // pre-computed analysis — passed to Python to skip librosa re-run
+  analysis?: AnalysisData;          // pre-computed analysis — passed to Python to skip librosa re-run
+  referenceAnalysis?: AnalysisData; // optional reference track analysis for reference mastering
   isProcessing: boolean;
   onStart: () => void;
   onProgress: (step: ProgressStep) => void;
@@ -32,6 +33,7 @@ const STEP_LABELS: Record<string, string> = {
 export default function MasterButton({
   fileId, platform, preset, intensity, selectedFormat,
   analysis,
+  referenceAnalysis,
   isProcessing, onStart, onProgress, onComplete, onError,
   compact = false,
 }: Props) {
@@ -74,7 +76,7 @@ export default function MasterButton({
       const response = await fetch("/api/master", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId, platform, preset, intensity, format: selectedFormat, analysis }),
+        body: JSON.stringify({ file_id: fileId, platform, preset, intensity, format: selectedFormat, analysis, reference_analysis: referenceAnalysis }),
         signal: controller.signal,
       });
       if (!response.ok || !response.body) { onError(); return; }

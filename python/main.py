@@ -79,7 +79,8 @@ class MasterRequest(BaseModel):
     intensity: int = 65
     format: str = "mp3128"
     output_dir: str = "./uploads/masters"
-    analysis: Optional[dict] = None  # pre-computed analysis from /analyze — skips librosa re-run
+    analysis: Optional[dict] = None             # pre-computed analysis — skips librosa re-run
+    reference_analysis: Optional[dict] = None   # optional reference track analysis for reference mastering
 
 
 # ─── Routes ────────────────────────────────────────────────────────────────────
@@ -159,7 +160,10 @@ async def master(req: MasterRequest):
             # Get AI mastering params (Claude API, max 10s, falls back to defaults)
             params = await loop.run_in_executor(
                 None,
-                lambda: get_mastering_params(analysis_dict, req.platform, req.preset, req.intensity)
+                lambda: get_mastering_params(
+                    analysis_dict, req.platform, req.preset, req.intensity,
+                    reference_analysis=req.reference_analysis,
+                )
             )
 
             yield encode({"step": "eq", "progress": 28, "label": "Applying EQ correction…"})

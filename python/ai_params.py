@@ -12,6 +12,7 @@ import anthropic
 
 SYSTEM_PROMPT = """You are a world-class audio mastering engineer with 30 years experience.
 You receive technical audio analysis data and must return precise, professional mastering parameters as JSON.
+When a Reference Track section is present, shape the tonal balance, dynamic character, and stereo width to match it as closely as possible — EQ bands, compression ratios and stereo width must directly compensate for differences between source and reference spectra.
 Consider genre, energy, dynamics, and spectral balance. Aim for a sound that is:
 - Punchy, clear, and wide
 - Tonally balanced and genre-appropriate
@@ -64,6 +65,22 @@ Return JSON mastering parameters:
   "bus_comp_threshold": <float>, "bus_comp_ratio": <float>,
   "notes": "brief description of mastering approach"
 }}"""
+
+
+REFERENCE_SECTION_TEMPLATE = """
+Reference Track (match this tonal character and dynamics):
+- Ref Integrated LUFS: {ref_integrated_lufs:.1f}
+- Ref True Peak: {ref_true_peak:.1f} dBTP
+- Ref Sub RMS (20-80Hz): {ref_rms_sub:.1f} dB
+- Ref Low RMS (80-500Hz): {ref_rms_low:.1f} dB
+- Ref Mid RMS (500-5kHz): {ref_rms_mid:.1f} dB
+- Ref High RMS (5-12kHz): {ref_rms_high:.1f} dB
+- Ref Air RMS (12-20kHz): {ref_rms_air:.1f} dB
+- Ref Spectral Centroid: {ref_spectral_centroid:.0f} Hz
+- Ref Spectral Flatness: {ref_spectral_flatness:.3f}
+- Ref Stereo Width: {ref_stereo_width:.2f}
+
+Use these reference values to compensate: if ref has more high-end (higher centroid), increase air/presence EQ; if ref is narrower/wider, adjust stereo_width accordingly; match the relative band energies by setting EQ shelves and multiband ratios."""
 
 
 @dataclass
@@ -154,17 +171,34 @@ def get_mastering_params(
     platform: str = "spotify",
     preset: str = "auto",
     intensity: int = 65,
+    reference_analysis: Optional[dict] = None,
 ) -> MasteringParams:
     """Get AI-selected mastering parameters from Claude API."""
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        return get_default_params(analysis, platform, preset)
+        return get_default_params(analysis, platform, preset, intensity, reference_analysis)
 
     try:
         client = anthropic.Anthropic(api_key=api_key)
 
         prompt = USER_PROMPT_TEMPLATE.format(**{**analysis, "platform": platform, "preset": preset})
+
+        # Append reference track section if provided
+        if reference_analysis:
+            ref = reference_analysis
+            prompt += REFERENCE_SECTION_TEMPLATE.format(
+                ref_integrated_lufs=ref.get("integrated_lufs", -14.0),
+                ref_true_peak=ref.get("true_peak", -1.0),
+                ref_rms_sub=ref.get("rms_sub", -24.0),
+                ref_rms_low=ref.get("rms_low", -20.0),
+                ref_rms_mid=ref.get("rms_mid", -18.0),
+                ref_rms_high=ref.get("rms_high", -24.0),
+                ref_rms_air=ref.get("rms_air", -30.0),
+                ref_spectral_centroid=ref.get("spectral_centroid", 2000.0),
+                ref_spectral_flatness=ref.get("spectral_flatness", 0.1),
+                ref_stereo_width=ref.get("stereo_width", 1.0),
+            )
 
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -197,10 +231,13 @@ def get_mastering_params(
 
     except Exception as e:
         print(f"Claude API error: {e}, using default params")
-        return get_default_params(analysis, platform, preset, intensity)
+        params = get_default_params(analysis, platform, preset, intensity, reference_analysis)
+        # Prepend a visible marker so the frontend can show a warning
+        params.notes = f"[Preset-Fallback — KI-Parameter nicht verfügbar: {type(e).__name__}] " + params.notes
+        return params
 
 
-def get_default_params(analysis: dict, platform: str, preset: str, intensity: int = 65) -> MasteringParams:
+def get_default_params(analysis: dict, platform: str, preset: str, intensity: int = 65, reference_analysis: Optional[dict] = None) -> MasteringParams:
     """Fallback parameters based on preset and analysis."""
     params = MasteringParams()
     params.target_lufs = PLATFORM_LUFS.get(platform, -14.0)
@@ -245,5 +282,27 @@ def get_default_params(analysis: dict, platform: str, preset: str, intensity: in
 
     params.notes = f"Auto-selected for {preset} preset targeting {platform} at {params.target_lufs} LUFS."
     params.genre = preset if preset != "auto" else "Unknown"
+
+    # Basic reference-matching adjustments (used when Claude API unavailable)
+    if reference_analysis:
+        src_centroid = analysis.get("spectral_centroid", 2000.0)
+        ref_centroid = reference_analysis.get("spectral_centroid", 2000.0)
+        centroid_diff = ref_centroid - src_centroid
+        # Brighter reference → add air/presence; darker → reduce
+        params.air_gain      = float(max(-3.0, min(4.0, params.air_gain      + centroid_diff / 2000.0 * 2.0)))
+        params.presence_gain = float(max(-2.0, min(4.0, params.presence_gain + centroid_diff / 2000.0 * 1.0)))
+
+        # Stereo width match
+        ref_width = reference_analysis.get("stereo_width", 1.0)
+        params.stereo_width = float(max(0.5, min(2.0, ref_width)))
+
+        # Sub bass: if reference has less sub, tighten compression
+        ref_rms_sub = reference_analysis.get("rms_sub", -24.0)
+        src_rms_sub = analysis.get("rms_sub", -24.0)
+        if src_rms_sub > ref_rms_sub + 3:          # source has significantly more sub
+            params.mb_sub_ratio = min(6.0, params.mb_sub_ratio + 1.0)
+            params.mb_sub_threshold = max(-20.0, params.mb_sub_threshold + 2.0)
+
+        params.notes += " Reference track used for fallback spectral matching."
 
     return apply_intensity_scaling(params, intensity)

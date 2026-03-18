@@ -29,8 +29,10 @@ function StatRow({ label, value, unit, color }: { label: string; value: string |
   );
 }
 
-function CompareValue({ label, pre, post, unit }: { label: string; pre: number; post: number | null; unit?: string }) {
-  const improved = post !== null && post > pre;
+function CompareValue({ label, pre, post, unit, higherIsBetter = true }: {
+  label: string; pre: number; post: number | null; unit?: string; higherIsBetter?: boolean;
+}) {
+  const improved = post !== null && (higherIsBetter ? post > pre : post < pre);
   return (
     <div className="flex justify-between items-center py-1.5 border-b" style={{ borderColor: "var(--border-subtle)" }}>
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>{label}</span>
@@ -46,6 +48,32 @@ function CompareValue({ label, pre, post, unit }: { label: string; pre: number; 
             </span>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function MonoCompatRow({ pre, post }: { pre: number; post: number | null }) {
+  const val = post ?? pre;
+  const color = val >= 0.7 ? "var(--accent-cyan)" : val >= 0.5 ? "var(--accent-gold)" : "var(--accent-red)";
+  const label = val >= 0.7 ? "Good" : val >= 0.5 ? "Marginal" : "Poor";
+  return (
+    <div className="flex justify-between items-center py-1.5 border-b" style={{ borderColor: "var(--border-subtle)" }}>
+      <span className="text-xs" style={{ color: "var(--text-muted)" }}>Mono Compat</span>
+      <div className="flex items-center gap-2">
+        {post !== null && (
+          <span className="mono text-xs" style={{ color: "var(--text-muted)" }}>
+            {pre.toFixed(2)}
+          </span>
+        )}
+        {post !== null && <span style={{ color: "var(--text-muted)" }}>→</span>}
+        <span className="mono text-xs font-bold" style={{ color }}>
+          {(post ?? pre).toFixed(2)}
+        </span>
+        <span className="text-[9px] px-1 py-0.5 rounded font-bold"
+          style={{ background: `${color}18`, color, border: `1px solid ${color}33` }}>
+          {label}
+        </span>
       </div>
     </div>
   );
@@ -106,7 +134,29 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
 
         {/* Stereo Field */}
         <div className="glass-panel p-3 scanlines" style={{ height: 180 }}>
-          <div className="label mb-2">Stereo Field</div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="label">Stereo Field</span>
+            {/* Mono compatibility badge */}
+            {(() => {
+              const mc = postAnalysis?.mono_compatibility ?? preAnalysis.mono_compatibility;
+              const isBad  = mc < 0.5;
+              const isWarn = mc >= 0.5 && mc < 0.7;
+              if (!isBad && !isWarn) return null;
+              return (
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                  style={{
+                    background: isBad ? "rgba(255,71,87,0.15)" : "rgba(245,200,66,0.15)",
+                    border:     isBad ? "1px solid rgba(255,71,87,0.4)" : "1px solid rgba(245,200,66,0.4)",
+                    color:      isBad ? "var(--accent-red)" : "var(--accent-gold)",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {isBad ? "⚠ PHASE ISSUES" : "⚠ MONO WARN"}
+                </span>
+              );
+            })()}
+          </div>
           <StereoField
             stereoWidth={preAnalysis.stereo_width}
             monoCompatibility={preAnalysis.mono_compatibility}
@@ -132,10 +182,11 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         {/* Loudness */}
         <div className="glass-panel p-4">
           <div className="label mb-3">Loudness</div>
-          <CompareValue label="Integrated" pre={preAnalysis.integrated_lufs} post={postAnalysis?.integrated_lufs ?? null} unit=" LUFS" />
-          <CompareValue label="True Peak"  pre={preAnalysis.true_peak}       post={postAnalysis?.true_peak ?? null}       unit=" dBTP" />
+          <CompareValue label="Integrated" pre={preAnalysis.integrated_lufs} post={postAnalysis?.integrated_lufs ?? null} unit=" LUFS" higherIsBetter={true} />
+          <CompareValue label="True Peak"  pre={preAnalysis.true_peak}       post={postAnalysis?.true_peak ?? null}       unit=" dBTP" higherIsBetter={false} />
           <StatRow label="Dynamic Range" value={preAnalysis.dr_value.toFixed(0)} unit="DR" />
           <StatRow label="Crest Factor"  value={preAnalysis.crest_factor.toFixed(1)} unit="dB" />
+          <MonoCompatRow pre={preAnalysis.mono_compatibility} post={postAnalysis?.mono_compatibility ?? null} />
         </div>
 
         {/* Spectral */}
@@ -160,6 +211,41 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
           <StatRow label="Channels"    value={preAnalysis.channels === 2 ? "Stereo" : "Mono"} />
         </div>
       </div>
+
+      {/* Mono compatibility warning banner — shown when source has phase issues */}
+      {preAnalysis.mono_compatibility < 0.7 && (
+        <div
+          className="rounded-xl p-3 mt-4 flex items-start gap-2.5"
+          style={{
+            background: preAnalysis.mono_compatibility < 0.5
+              ? "rgba(255,71,87,0.07)"
+              : "rgba(245,200,66,0.07)",
+            border: preAnalysis.mono_compatibility < 0.5
+              ? "1px solid rgba(255,71,87,0.3)"
+              : "1px solid rgba(245,200,66,0.3)",
+          }}
+        >
+          <svg className="flex-shrink-0 mt-0.5" width="15" height="15" viewBox="0 0 24 24"
+            fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            stroke={preAnalysis.mono_compatibility < 0.5 ? "var(--accent-red)" : "var(--accent-gold)"}
+          >
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div>
+            <div className="text-xs font-semibold mb-0.5"
+              style={{ color: preAnalysis.mono_compatibility < 0.5 ? "var(--accent-red)" : "var(--accent-gold)" }}>
+              {preAnalysis.mono_compatibility < 0.5 ? "Phasenproblem erkannt" : "Mono-Kompatibilität niedrig"}
+            </div>
+            <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              {preAnalysis.mono_compatibility < 0.5
+                ? `Mono-Kompatibilität: ${preAnalysis.mono_compatibility.toFixed(2)} — starke Phasenauslöschung möglich. Mastering fügt automatisch Sub-Bass-Mono-Filter (< 120 Hz) hinzu.`
+                : `Mono-Kompatibilität: ${preAnalysis.mono_compatibility.toFixed(2)} — auf Mono-Geräten klingen Bässe eventuell dünner. Sub-Bass wird beim Mastering automatisch mono gestellt.`
+              }
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Frequency bands */}
       <div className="glass-panel p-4 mt-4">

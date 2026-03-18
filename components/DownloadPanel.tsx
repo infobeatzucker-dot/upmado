@@ -39,6 +39,13 @@ export default function DownloadPanel({ masterData, fileId, filename, platform, 
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const [showPayPal,    setShowPayPal]    = useState(false);
 
+  // Detect Claude API fallback
+  const isFallback = masterData.notes?.includes("[Preset-Fallback");
+  // Strip the [Preset-Fallback ...] prefix for display
+  const displayNotes = isFallback
+    ? masterData.notes.replace(/^\[Preset-Fallback[^\]]*\]\s*/, "")
+    : masterData.notes;
+
   // Build clean base name: strip extension + sanitize for filename
   const cleanName = filename
     .replace(/\.[^/.]+$/, "")               // remove extension
@@ -97,11 +104,41 @@ export default function DownloadPanel({ masterData, fileId, filename, platform, 
               Mastering complete
             </div>
             <div className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {masterData.notes}
+              {displayNotes}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Claude API Fallback Warning */}
+      {isFallback && (
+        <div
+          className="rounded-xl p-3 mb-4 flex items-start gap-2.5"
+          style={{
+            background: "rgba(245,180,0,0.07)",
+            border: "1px solid rgba(245,180,0,0.3)",
+          }}
+        >
+          <svg
+            className="flex-shrink-0 mt-0.5"
+            width="15" height="15" viewBox="0 0 24 24"
+            fill="none" stroke="#f5b800" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round"
+          >
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div>
+            <div className="text-xs font-semibold mb-0.5" style={{ color: "#f5b800" }}>
+              KI-Parameter nicht verfügbar
+            </div>
+            <div className="text-xs" style={{ color: "rgba(245,184,0,0.75)" }}>
+              Claude API konnte nicht erreicht werden — Preset-Fallback wurde verwendet. Das Ergebnis basiert auf vordefinierten Parametern.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Report button row */}
       <div className="flex justify-end mb-4">

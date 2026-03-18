@@ -129,7 +129,7 @@ export default function Home() {
   const [intensity,        setIntensity]        = useState<number>(65);
   const [currentProgress,  setCurrentProgress]  = useState<ProgressStep | null>(null);
   const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
-  const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
+  const [referenceAnalysis, setReferenceAnalysis] = useState<AnalysisData | null>(null);
 
   // Scroll targets
   const mainPanelRef  = useRef<HTMLDivElement>(null);
@@ -453,6 +453,7 @@ export default function Home() {
                   intensity={intensity}
                   selectedFormat={selectedFormat}
                   analysis={analysis ?? undefined}
+                  referenceAnalysis={referenceAnalysis ?? undefined}
                   isProcessing={false}
                   onStart={handleMasteringStart}
                   onProgress={handleProgressUpdate}

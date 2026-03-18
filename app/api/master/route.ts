@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
   const preset    = (body.preset    as string) || "auto";
   const intensity = Number(body.intensity ?? 65);
   const format    = (body.format    as string) || "mp3128";
-  const analysis  = body.analysis   as object | undefined;  // pre-computed analysis from /api/analyze
+  const analysis          = body.analysis           as object | undefined;  // pre-computed analysis from /api/analyze
+  const referenceAnalysis = body.reference_analysis as object | undefined;  // reference track analysis for reference mastering
 
   if (!fileId) {
     return new Response("file_id required", { status: 400 });
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
             intensity,
             format,
             output_dir: path.resolve(path.join(UPLOAD_DIR, "masters")),
-            ...(analysis ? { analysis } : {}),
+            ...(analysis          ? { analysis }                               : {}),
+            ...(referenceAnalysis ? { reference_analysis: referenceAnalysis } : {}),
           }),
           signal: AbortSignal.timeout(540000), // 9 min timeout
         });
