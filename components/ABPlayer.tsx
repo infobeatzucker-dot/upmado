@@ -36,9 +36,10 @@ export default function ABPlayer({ filename }: Props) {
   const vuLRef            = useRef<HTMLCanvasElement>(null);
   const vuRRef            = useRef<HTMLCanvasElement>(null);
 
-  const scrubberRef = useRef<HTMLDivElement>(null);
-  const animRef     = useRef<number>(0);
-  const isDragging  = useRef(false);
+  const scrubberRef  = useRef<HTMLDivElement>(null);
+  const waveAreaRef  = useRef<HTMLDivElement>(null);
+  const animRef      = useRef<number>(0);
+  const isDragging   = useRef(false);
 
   // ── Draw static decoded waveform ───────────────────────────────────────────
   useEffect(() => {
@@ -229,8 +230,8 @@ export default function ABPlayer({ filename }: Props) {
   }, [engine]);
 
   // ── Scrubber ───────────────────────────────────────────────────────────────
-  const handleScrub = useCallback((e: React.MouseEvent<HTMLDivElement> | MouseEvent) => {
-    const bar = scrubberRef.current;
+  const handleScrub = useCallback((e: React.MouseEvent<HTMLDivElement> | MouseEvent, ref?: React.RefObject<HTMLDivElement | null>) => {
+    const bar = (ref ?? scrubberRef).current;
     if (!bar || !engine) return;
     const rect  = bar.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -238,7 +239,7 @@ export default function ABPlayer({ filename }: Props) {
   }, [engine]);
 
   useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => { if (isDragging.current) handleScrub(e); };
+    const onMouseMove = (e: MouseEvent) => { if (isDragging.current) handleScrub(e, waveAreaRef); };
     const onMouseUp   = ()              => { isDragging.current = false; };
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup",   onMouseUp);
@@ -352,8 +353,14 @@ export default function ABPlayer({ filename }: Props) {
         })}
       </div>
 
-      {/* Waveform + Oscilloscope canvas area */}
-      <div className="relative mx-5 mb-3 rounded-xl overflow-hidden" style={{ height: 80 }}>
+      {/* Waveform + Oscilloscope canvas area — clickable to seek */}
+      <div
+        ref={waveAreaRef}
+        className="relative mx-5 mb-3 rounded-xl overflow-hidden"
+        style={{ height: 80, cursor: "pointer" }}
+        onClick={(e) => handleScrub(e, waveAreaRef)}
+        onMouseDown={() => { isDragging.current = true; }}
+      >
         {/* Static decoded waveform */}
         <canvas
           ref={waveCanvasRef}

@@ -87,6 +87,7 @@ export default function Home() {
   const [preset,           setPreset]           = useState<Preset>("auto");
   const [intensity,        setIntensity]        = useState<number>(65);
   const [currentProgress,  setCurrentProgress]  = useState<ProgressStep | null>(null);
+  const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
   // Reference track (null = no reference)
   const [, setReferenceAnalysis] = useState<AnalysisData | null>(null);
 
@@ -116,6 +117,22 @@ export default function Home() {
       {/* Hero */}
       <section className="relative pt-24 pb-8 px-4 text-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
+          {/* Video background */}
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ opacity: 0.12, filter: "blur(1px) saturate(1.4)" }}
+          >
+            <source src="/hero-bg.mp4" type="video/mp4" />
+          </video>
+          {/* Dark overlay so text stays readable */}
+          <div
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(to bottom, rgba(8,10,18,0.4) 0%, rgba(8,10,18,0.1) 50%, rgba(8,10,18,0.7) 100%)" }}
+          />
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full"
             style={{ background: "radial-gradient(ellipse at center, rgba(124,111,255,0.08) 0%, transparent 70%)" }}
@@ -166,46 +183,10 @@ export default function Home() {
                 : "0 4px 40px rgba(0,0,0,0.4)",
             }}
           >
-            {/* Panel header row — shows "New Master" button when done */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="grid grid-cols-2 gap-4 flex-1 mr-4">
-                <PlatformTargets value={platform} onChange={setPlatform} />
-                <PresetSelector  value={preset}   onChange={setPreset} />
-              </div>
-
-              <AnimatePresence>
-                {(appState === "done" || appState === "analyzed" || appState === "mastering") && (
-                  <motion.button
-                    key="new-master-btn"
-                    onClick={handleReset}
-                    initial={{ opacity: 0, scale: 0.85, x: 10 }}
-                    animate={{ opacity: 1, scale: 1,    x: 0  }}
-                    exit={{   opacity: 0, scale: 0.85, x: 10  }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{  scale: 0.97 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
-                    style={{
-                      background: appState === "done"
-                        ? "linear-gradient(135deg, rgba(124,111,255,0.2), rgba(0,229,196,0.15))"
-                        : "rgba(255,255,255,0.04)",
-                      border: appState === "done"
-                        ? "1px solid rgba(124,111,255,0.4)"
-                        : "1px solid rgba(255,255,255,0.08)",
-                      color: appState === "done" ? "var(--accent-purple)" : "var(--text-muted)",
-                      boxShadow: appState === "done" ? "0 0 16px rgba(124,111,255,0.15)" : "none",
-                    }}
-                  >
-                    {/* Refresh icon */}
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                      stroke={appState === "done" ? "var(--accent-purple)" : "var(--text-muted)"}>
-                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                      <path d="M3 3v5h5"/>
-                    </svg>
-                    New Master
-                  </motion.button>
-                )}
-              </AnimatePresence>
+            {/* Panel header row */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <PlatformTargets value={platform} onChange={setPlatform} />
+              <PresetSelector  value={preset}   onChange={setPreset} />
             </div>
 
             {/* Intensity + Reference Track row */}
@@ -283,7 +264,7 @@ export default function Home() {
               )}
             </AnimatePresence>
 
-            {/* Master Button */}
+            {/* Format selector + Master Button */}
             <AnimatePresence>
               {(appState === "analyzed" || appState === "mastering") && uploadedFile && (
                 <motion.div
@@ -293,11 +274,59 @@ export default function Home() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.3 }}
                 >
+                  {/* Export format picker */}
+                  {appState === "analyzed" && (
+                    <div className="mt-4 mb-1">
+                      <div className="label mb-2" style={{ color: "var(--text-muted)" }}>Export-Format wählen</div>
+                      <div className="flex flex-wrap gap-2">
+                        {([
+                          { key: "mp3128",  label: "MP3 128",    tier: "free", desc: "kostenlos" },
+                          { key: "mp3320",  label: "MP3 320",    tier: "paid", desc: "Premium" },
+                          { key: "wav16",   label: "WAV 16-bit", tier: "paid", desc: "CD-Qualität" },
+                          { key: "wav24",   label: "WAV 24-bit", tier: "paid", desc: "Studio" },
+                          { key: "flac",    label: "FLAC",       tier: "paid", desc: "Lossless" },
+                          { key: "aac256",  label: "AAC 256",    tier: "paid", desc: "Streaming" },
+                          { key: "wav32",   label: "WAV 32-bit", tier: "pro",  desc: "Pro" },
+                        ] as const).map((fmt) => {
+                          const active = selectedFormat === fmt.key;
+                          const isFree = fmt.tier === "free";
+                          const isPro  = fmt.tier === "pro";
+                          return (
+                            <button
+                              key={fmt.key}
+                              onClick={() => setSelectedFormat(fmt.key)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                              style={{
+                                background: active
+                                  ? "linear-gradient(135deg, rgba(124,111,255,0.25), rgba(0,229,196,0.15))"
+                                  : "rgba(255,255,255,0.04)",
+                                border: active
+                                  ? "1px solid rgba(124,111,255,0.5)"
+                                  : "1px solid rgba(255,255,255,0.08)",
+                                color: active ? "var(--accent-purple)" : "var(--text-muted)",
+                                boxShadow: active ? "0 0 12px rgba(124,111,255,0.2)" : "none",
+                              }}
+                            >
+                              {fmt.label}
+                              {isFree && (
+                                <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(0,229,196,0.15)", color: "var(--accent-cyan)" }}>FREE</span>
+                              )}
+                              {isPro && (
+                                <span className="text-[9px] px-1 py-0.5 rounded" style={{ background: "rgba(245,200,66,0.15)", color: "var(--accent-gold)" }}>PRO</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <MasterButton
                     fileId={uploadedFile.file_id}
                     platform={platform}
                     preset={preset}
                     intensity={intensity}
+                    selectedFormat={selectedFormat}
                     isProcessing={appState === "mastering"}
                     onStart={handleMasteringStart}
                     onProgress={handleProgressUpdate}

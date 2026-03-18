@@ -8,6 +8,7 @@ interface Props {
   platform: Platform;
   preset: Preset;
   intensity: number;          // 0–100
+  selectedFormat: string;
   isProcessing: boolean;
   onStart: () => void;
   onProgress: (step: ProgressStep) => void;
@@ -27,7 +28,7 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 export default function MasterButton({
-  fileId, platform, preset, intensity,
+  fileId, platform, preset, intensity, selectedFormat,
   isProcessing, onStart, onProgress, onComplete, onError,
 }: Props) {
   const particleContainerRef = useRef<HTMLDivElement>(null);
@@ -60,7 +61,7 @@ export default function MasterButton({
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const url = `/api/master?file_id=${fileId}&platform=${platform}&preset=${preset}&intensity=${intensity}`;
+    const url = `/api/master?file_id=${fileId}&platform=${platform}&preset=${preset}&intensity=${intensity}&format=${selectedFormat}`;
 
     try {
       const response = await fetch(url, { signal: controller.signal });
@@ -157,7 +158,7 @@ export default function MasterButton({
 
       {!isProcessing && (
         <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
-          Full professional mastering chain · AI parameter selection · All formats included
+          Professionelle Mastering-Chain · KI-Parameterwahl · Format: <span style={{ color: "var(--accent-cyan)" }}>{selectedFormat.toUpperCase()}</span>
         </p>
       )}
     </div>

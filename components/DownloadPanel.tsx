@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { MasterData } from "@/app/page";
 import ABPlayer from "./ABPlayer";
@@ -244,6 +245,27 @@ export default function DownloadPanel({ masterData, fileId, filename, platform, 
           ✓ All formats unlocked · Download link valid for 7 days
         </div>
       )}
+
+      {/* New Master CTA */}
+      <motion.button
+        onClick={onReset}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
+        style={{
+          background: "rgba(124,111,255,0.08)",
+          border: "1px solid rgba(124,111,255,0.25)",
+          color: "var(--accent-purple)",
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round" stroke="var(--accent-purple)">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        Neuen Master erstellen
+      </motion.button>
     </div>
   );
 }

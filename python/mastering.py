@@ -315,58 +315,68 @@ def apply_dither(audio: np.ndarray, target_bit_depth: int = 16) -> np.ndarray:
     return audio + dither
 
 
-def export_formats(audio: np.ndarray, sr: int, output_dir: str, master_id: str) -> dict:
-    """Export audio to all required formats."""
+def export_formats(audio: np.ndarray, sr: int, output_dir: str, master_id: str, selected_format: str = "mp3128") -> dict:
+    """Export only the selected format (plus mp3128 as preview fallback)."""
     os.makedirs(output_dir, exist_ok=True)
     paths = {}
 
-    # WAV 32-bit float
-    path32 = os.path.join(output_dir, f"{master_id}_wav32.wav")
-    sf.write(path32, audio.T if audio.ndim == 2 else audio, sr, subtype="FLOAT")
-    paths["wav32"] = path32
+    # Always produce mp3128 as a free preview fallback
+    formats_to_render = {selected_format, "mp3128"}
 
-    # WAV 24-bit
-    path24 = os.path.join(output_dir, f"{master_id}_wav24.wav")
-    sf.write(path24, audio.T if audio.ndim == 2 else audio, sr, subtype="PCM_24")
-    paths["wav24"] = path24
+    # WAV formats (soundfile)
+    if "wav32" in formats_to_render:
+        p = os.path.join(output_dir, f"{master_id}_wav32.wav")
+        sf.write(p, audio.T if audio.ndim == 2 else audio, sr, subtype="FLOAT")
+        paths["wav32"] = p
 
-    # WAV 16-bit with dither
-    audio16 = apply_dither(audio, 16)
-    path16 = os.path.join(output_dir, f"{master_id}_wav16.wav")
-    sf.write(path16, audio16.T if audio16.ndim == 2 else audio16, sr, subtype="PCM_16")
-    paths["wav16"] = path16
+    if "wav24" in formats_to_render:
+        p = os.path.join(output_dir, f"{master_id}_wav24.wav")
+        sf.write(p, audio.T if audio.ndim == 2 else audio, sr, subtype="PCM_24")
+        paths["wav24"] = p
 
-    # FLAC
-    path_flac = os.path.join(output_dir, f"{master_id}_flac.flac")
-    sf.write(path_flac, audio.T if audio.ndim == 2 else audio, sr, format="FLAC", subtype="PCM_24")
-    paths["flac"] = path_flac
+    if "wav16" in formats_to_render:
+        audio16 = apply_dither(audio, 16)
+        p = os.path.join(output_dir, f"{master_id}_wav16.wav")
+        sf.write(p, audio16.T if audio16.ndim == 2 else audio16, sr, subtype="PCM_16")
+        paths["wav16"] = p
 
-    # MP3 formats via ffmpeg-python
-    try:
-        import ffmpeg
-        path_mp3_320 = os.path.join(output_dir, f"{master_id}_mp3320.mp3")
-        path_mp3_128 = os.path.join(output_dir, f"{master_id}_mp3128.mp3")
-        path_aac = os.path.join(output_dir, f"{master_id}_aac256.m4a")
+    if "flac" in formats_to_render:
+        p = os.path.join(output_dir, f"{master_id}_flac.flac")
+        sf.write(p, audio.T if audio.ndim == 2 else audio, sr, format="FLAC", subtype="PCM_24")
+        paths["flac"] = p
 
-        # Write temp WAV first
-        tmp_wav = os.path.join(output_dir, f"{master_id}_tmp.wav")
-        sf.write(tmp_wav, audio.T if audio.ndim == 2 else audio, sr, subtype="PCM_24")
+    # FFmpeg formats (mp3/aac)
+    need_ffmpeg = formats_to_render & {"mp3320", "mp3128", "aac256"}
+    if need_ffmpeg:
+        try:
+            import ffmpeg
+            tmp_wav = os.path.join(output_dir, f"{master_id}_tmp.wav")
+            sf.write(tmp_wav, audio.T if audio.ndim == 2 else audio, sr, subtype="PCM_24")
 
-        ffmpeg.input(tmp_wav).output(path_mp3_320, audio_bitrate="320k", acodec="libmp3lame").overwrite_output().run(quiet=True)
-        ffmpeg.input(tmp_wav).output(path_mp3_128, audio_bitrate="128k", acodec="libmp3lame").overwrite_output().run(quiet=True)
-        ffmpeg.input(tmp_wav).output(path_aac,     audio_bitrate="256k", acodec="aac").overwrite_output().run(quiet=True)
+            if "mp3320" in need_ffmpeg:
+                p = os.path.join(output_dir, f"{master_id}_mp3320.mp3")
+                ffmpeg.input(tmp_wav).output(p, audio_bitrate="320k", acodec="libmp3lame").overwrite_output().run(quiet=True)
+                paths["mp3320"] = p
 
-        os.remove(tmp_wav)
+            if "mp3128" in need_ffmpeg:
+                p = os.path.join(output_dir, f"{master_id}_mp3128.mp3")
+                ffmpeg.input(tmp_wav).output(p, audio_bitrate="128k", acodec="libmp3lame").overwrite_output().run(quiet=True)
+                paths["mp3128"] = p
 
-        paths["mp3320"] = path_mp3_320
-        paths["mp3128"] = path_mp3_128
-        paths["aac256"] = path_aac
-    except Exception as e:
-        print(f"FFmpeg export error: {e}")
-        # Fallback: use WAV for mp3 paths
-        paths["mp3320"] = path24
-        paths["mp3128"] = path24
-        paths["aac256"] = path24
+            if "aac256" in need_ffmpeg:
+                p = os.path.join(output_dir, f"{master_id}_aac256.m4a")
+                ffmpeg.input(tmp_wav).output(p, audio_bitrate="256k", acodec="aac").overwrite_output().run(quiet=True)
+                paths["aac256"] = p
+
+            os.remove(tmp_wav)
+        except Exception as e:
+            print(f"FFmpeg export error: {e}")
+            # Fallback: WAV 24-bit copy
+            fallback = os.path.join(output_dir, f"{master_id}_wav24.wav")
+            if not os.path.exists(fallback):
+                sf.write(fallback, audio.T if audio.ndim == 2 else audio, sr, subtype="PCM_24")
+            for fmt in need_ffmpeg:
+                paths[fmt] = fallback
 
     return paths
 
@@ -378,6 +388,7 @@ def master_audio(
     params: MasteringParams,
     output_dir: str,
     progress_callback: Optional[Callable[[str, int], None]] = None,
+    selected_format: str = "mp3128",
 ) -> MasteringResult:
     """Execute the full 12-stage mastering chain."""
 
@@ -438,7 +449,7 @@ def master_audio(
 
     # 12. Export all formats
     master_id = str(uuid.uuid4())
-    paths = export_formats(audio, sr, output_dir, master_id)
+    paths = export_formats(audio, sr, output_dir, master_id, selected_format)
 
     # Post-analysis
     from analyzer import analyze_audio, analysis_to_dict

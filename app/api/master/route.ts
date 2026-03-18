@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
   const platform = searchParams.get("platform") || "spotify";
   const preset = searchParams.get("preset") || "auto";
   const intensity = parseInt(searchParams.get("intensity") || "65", 10);
+  const format = searchParams.get("format") || "mp3128";
 
   if (!fileId) {
     return new Response("file_id required", { status: 400 });
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
             platform,
             preset,
             intensity,
+            format,
             output_dir: path.resolve(path.join(UPLOAD_DIR, "masters")),
           }),
           signal: AbortSignal.timeout(300000), // 5 min timeout
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest) {
 
         if (!res.ok || !res.body) {
           // Fallback: send mock progress for development
-          await simulateMockProgress(send);
+          await simulateMockProgress(send, format);
           controller.close();
           return;
         }
@@ -118,14 +120,14 @@ export async function GET(req: NextRequest) {
 
         if (!pythonCompleted) {
           // Python failed or incomplete → run mock
-          await simulateMockProgress(send);
+          await simulateMockProgress(send, format);
         }
 
         controller.close();
       } catch (err) {
         console.error("Mastering error:", err);
         // Simulate for dev
-        await simulateMockProgress(send);
+        await simulateMockProgress(send, format);
         controller.close();
       }
     },
@@ -142,8 +144,10 @@ export async function GET(req: NextRequest) {
 }
 
 async function simulateMockProgress(
-  send: (data: object) => void
+  send: (data: object) => void,
+  format = "mp3128"
 ) {
+  const renderLabel = `Rendering ${format.toUpperCase()}…`;
   const steps = [
     { step: "analyzing",   progress: 10, label: "Analyzing track…" },
     { step: "eq",          progress: 30, label: "Applying EQ correction…" },
@@ -151,7 +155,7 @@ async function simulateMockProgress(
     { step: "ms",          progress: 60, label: "M/S processing…" },
     { step: "saturation",  progress: 70, label: "Harmonic saturation…" },
     { step: "limiting",    progress: 85, label: "True Peak limiting…" },
-    { step: "rendering",   progress: 95, label: "Rendering all formats…" },
+    { step: "rendering",   progress: 95, label: renderLabel },
   ];
 
   for (const step of steps) {
@@ -162,18 +166,20 @@ async function simulateMockProgress(
   await delay(800);
 
   const masterId = randomUUID();
+  // Only return the selected format URL
+  const formatUrl = `/api/download?master_id=${masterId}&format=${format}`;
   send({
     step: "complete",
     progress: 100,
     master_id: masterId,
     formats: {
-      wav32: `/api/download?master_id=${masterId}&format=wav32`,
-      wav24: `/api/download?master_id=${masterId}&format=wav24`,
-      wav16: `/api/download?master_id=${masterId}&format=wav16`,
-      flac: `/api/download?master_id=${masterId}&format=flac`,
-      mp3320: `/api/download?master_id=${masterId}&format=mp3320`,
-      mp3128: `/api/download?master_id=${masterId}&format=mp3128`,
-      aac256: `/api/download?master_id=${masterId}&format=aac256`,
+      wav32:  format === "wav32"  ? formatUrl : "",
+      wav24:  format === "wav24"  ? formatUrl : "",
+      wav16:  format === "wav16"  ? formatUrl : "",
+      flac:   format === "flac"   ? formatUrl : "",
+      mp3320: format === "mp3320" ? formatUrl : "",
+      mp3128: format === "mp3128" ? formatUrl : "",
+      aac256: format === "aac256" ? formatUrl : "",
     },
     post_analysis: {
       integrated_lufs: -14.0,

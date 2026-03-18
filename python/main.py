@@ -76,6 +76,7 @@ class MasterRequest(BaseModel):
     platform: str = "spotify"
     preset: str = "auto"
     intensity: int = 65
+    format: str = "mp3128"
     output_dir: str = "./uploads/masters"
 
 
@@ -165,9 +166,12 @@ async def master(req: MasterRequest):
                 ("rendering",   94, "Rendering all formats…"),
             ]
 
+            render_label = f"Rendering {req.format.upper()}…"
+            step_map[-1] = ("rendering", 94, render_label)
+
             loop = asyncio.get_event_loop()
             mastering_task = loop.run_in_executor(
-                None, master_audio, req.file_path, params, req.output_dir
+                None, master_audio, req.file_path, params, req.output_dir, None, req.format
             )
 
             # Emit progress while mastering runs
