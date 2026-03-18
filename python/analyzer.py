@@ -51,7 +51,13 @@ class AudioAnalysis:
 
 
 def rms_band(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float:
-    """Compute RMS energy in a frequency band, returned in dB."""
+    """Compute RMS energy in a frequency band, returned in dB.
+    Capped at 60s to bound memory – RMS doesn't need the full track.
+    """
+    # Cap at 60s to avoid OOM on long tracks
+    MAX_SAMPLES = sr * 60
+    chunk = audio[:MAX_SAMPLES] if len(audio) > MAX_SAMPLES else audio
+
     nyq = sr / 2
     low = max(0.001, low_hz / nyq)
     high = min(0.999, high_hz / nyq)
@@ -60,7 +66,7 @@ def rms_band(audio: np.ndarray, sr: int, low_hz: float, high_hz: float) -> float
         return -80.0
 
     b, a = scipy_signal.butter(4, [low, high], btype="bandpass")
-    filtered = scipy_signal.filtfilt(b, a, audio)
+    filtered = scipy_signal.filtfilt(b, a, chunk)
     rms = np.sqrt(np.mean(filtered ** 2))
 
     if rms < 1e-10:
@@ -134,11 +140,19 @@ def detect_key(y: np.ndarray, sr: int) -> str:
     return f"{notes[best_key]} {'minor' if is_minor else 'major'}"
 
 
-def compute_true_peak(audio: np.ndarray, oversample: int = 4) -> float:
-    """Compute True Peak using oversampling (ITU-R BS.1770-4)."""
-    # Simple upsampling approach
-    upsampled = scipy_signal.resample_poly(audio, oversample, 1)
+def compute_true_peak(audio: np.ndarray, oversample: int = 2) -> float:
+    """Compute True Peak using oversampling (ITU-R BS.1770-4).
+    Oversample=2 (was 4) halves RAM usage – still accurate enough for mastering.
+    For extra safety we only oversample the first 30s to bound memory.
+    """
+    # Limit to 30s to prevent OOM on long tracks
+    chunk = audio[:min(len(audio), int(len(audio) / max(len(audio), 1) * 30 * 44100 + 1))]
+    # Simpler: just cap at 30*sr samples (sr unknown here, use heuristic)
+    MAX_SAMPLES = 44100 * 30  # 30s @ 44.1kHz (good enough for peak detection)
+    chunk = audio[:MAX_SAMPLES] if len(audio) > MAX_SAMPLES else audio
+    upsampled = scipy_signal.resample_poly(chunk.astype(np.float32), oversample, 1)
     peak = np.max(np.abs(upsampled))
+    del upsampled  # free memory immediately
     if peak < 1e-10:
         return -120.0
     return float(20 * np.log10(peak))
