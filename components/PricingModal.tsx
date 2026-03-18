@@ -10,25 +10,45 @@ interface Props {
 }
 
 const PLAN_DETAILS: Record<string, { name: string; price: string; features: string[] }> = {
-  basic_monthly: {
-    name: "Basic Monthly",
-    price: "€9.99/month",
-    features: ["15 masters/month", "All formats", "Download history", "Re-download anytime"],
+  creator_monthly: {
+    name: "Creator Monatlich",
+    price: "€7.99/Monat",
+    features: ["25 Master/Monat", "KI-Parameterauswahl", "Alle Formate", "Download-Verlauf"],
+  },
+  creator_annual: {
+    name: "Creator Jährlich",
+    price: "€67.10/Jahr",
+    features: ["25 Master/Monat", "KI-Parameterauswahl", "Alle Formate", "3 Monate gratis vs. monatlich"],
   },
   pro_monthly: {
-    name: "Pro Monthly",
-    price: "€24.99/month",
-    features: ["Unlimited masters", "WAV 32-bit float", "Priority processing", "Stems mastering", "API access"],
-  },
-  basic_annual: {
-    name: "Basic Annual",
-    price: "€83.90/year",
-    features: ["15 masters/month", "All formats", "2 months free vs monthly"],
+    name: "Pro Monatlich",
+    price: "€14.99/Monat",
+    features: ["100 Master/Monat", "KI-Parameterauswahl", "Alle Formate", "Referenz-Track Mastering"],
   },
   pro_annual: {
-    name: "Pro Annual",
-    price: "€209.90/year",
-    features: ["Unlimited masters", "All Pro features", "2 months free vs monthly"],
+    name: "Pro Jährlich",
+    price: "€125.90/Jahr",
+    features: ["100 Master/Monat", "KI-Parameterauswahl", "Alle Pro-Features", "3 Monate gratis"],
+  },
+  proplus_monthly: {
+    name: "Pro+ Monatlich",
+    price: "€24.99/Monat",
+    features: ["250 Master/Monat", "KI-Parameterauswahl", "WAV 32-bit Float", "Prioritäts-Processing"],
+  },
+  proplus_annual: {
+    name: "Pro+ Jährlich",
+    price: "€209.90/Jahr",
+    features: ["250 Master/Monat", "Alle Pro+-Features", "WAV 32-bit Float", "3 Monate gratis"],
+  },
+  studio_monthly: {
+    name: "Studio Monatlich",
+    price: "€49.99/Monat",
+    features: ["Unbegrenzte Master", "API-Zugang", "Stems Mastering", "White-Label Report", "Team-Seats (3)"],
+  },
+  studio_annual: {
+    name: "Studio Jährlich",
+    price: "€419.90/Jahr",
+    features: ["Unbegrenzte Master", "API-Zugang", "Alle Studio-Features", "3 Monate gratis"],
   },
 };
 
@@ -61,20 +81,17 @@ export default function PricingModal({ isOpen, onClose, selectedPlan }: Props) {
               <span className="text-2xl">✓</span>
             </div>
             <h3 className="text-lg font-bold mb-2" style={{ color: "var(--accent-cyan)" }}>
-              Subscription active!
+              Abo aktiv!
             </h3>
             <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
-              You now have full access to all {plan?.name} features.
+              Du hast jetzt vollen Zugang zu allen {plan?.name}-Features.
             </p>
             <button
               onClick={onClose}
               className="w-full py-2.5 rounded-xl text-sm font-medium"
-              style={{
-                background: "var(--accent-cyan)",
-                color: "#000",
-              }}
+              style={{ background: "var(--accent-cyan)", color: "#000" }}
             >
-              Start mastering
+              Mastering starten
             </button>
           </div>
         ) : (
@@ -82,7 +99,7 @@ export default function PricingModal({ isOpen, onClose, selectedPlan }: Props) {
             <div className="flex justify-between items-start mb-5">
               <div>
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
-                  {plan?.name || "Subscribe"}
+                  {plan?.name || "Abo wählen"}
                 </h3>
                 <div className="mono text-lg font-bold mt-0.5" style={{ color: "var(--accent-gold)" }}>
                   {plan?.price}
@@ -111,16 +128,16 @@ export default function PricingModal({ isOpen, onClose, selectedPlan }: Props) {
             {selectedPlan ? (
               <PayPalSubscribeButton
                 planType={selectedPlan}
-                label={`Subscribe – ${plan?.price}`}
+                label={`Abonnieren – ${plan?.price}`}
               />
             ) : (
               <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
-                Select a plan to continue
+                Plan auswählen um fortzufahren
               </p>
             )}
 
             <p className="text-xs text-center mt-3" style={{ color: "var(--text-muted)" }}>
-              Cancel anytime · Billed via PayPal · No hidden fees
+              Jederzeit kündbar · Zahlung via PayPal · Keine versteckten Kosten
             </p>
           </>
         )}
