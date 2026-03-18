@@ -104,39 +104,44 @@ def apply_correction_eq(audio: np.ndarray, sr: int, params: MasteringParams) -> 
 # ─── 5. MULTIBAND COMPRESSION ──────────────────────────────────────────────────
 
 def linkwitz_riley_crossover(audio: np.ndarray, sr: int, crossover_hz: float, order: int = 4):
-    """Split audio into low and high bands.
+    """Split audio into low and high bands using a true Linkwitz-Riley crossover.
+    Two cascaded Butterworth filters (LR4) give a flat summed response and
+    identical phase in both bands — eliminates comb filtering at the crossover.
     sosfilt = numerically stable SOS form + single-pass (low RAM, no overflow).
     """
     nyq = sr / 2
     norm_freq = float(np.clip(crossover_hz / nyq, 0.01, 0.99))
 
+    # True LR: cascade two identical Butterworth filters of order/2 each.
+    # Both LP and HP are –6 dB at crossover; LP + HP = 0 dB (flat sum).
     sos_low  = scipy_signal.butter(order // 2, norm_freq, btype="low",  output="sos")
     sos_high = scipy_signal.butter(order // 2, norm_freq, btype="high", output="sos")
 
     if audio.ndim == 2:
-        low  = np.stack([scipy_signal.sosfilt(sos_low,  ch).astype(np.float32) for ch in audio])
-        high = np.stack([scipy_signal.sosfilt(sos_high, ch).astype(np.float32) for ch in audio])
+        low  = np.stack([scipy_signal.sosfilt(sos_low,  scipy_signal.sosfilt(sos_low,  ch)).astype(np.float32) for ch in audio])
+        high = np.stack([scipy_signal.sosfilt(sos_high, scipy_signal.sosfilt(sos_high, ch)).astype(np.float32) for ch in audio])
     else:
-        low  = scipy_signal.sosfilt(sos_low,  audio).astype(np.float32)
-        high = scipy_signal.sosfilt(sos_high, audio).astype(np.float32)
+        low  = scipy_signal.sosfilt(sos_low,  scipy_signal.sosfilt(sos_low,  audio)).astype(np.float32)
+        high = scipy_signal.sosfilt(sos_high, scipy_signal.sosfilt(sos_high, audio)).astype(np.float32)
 
     return low, high
 
 
 def compress_band(audio: np.ndarray, sr: int, threshold_db: float, ratio: float,
                   attack_ms: float = 20, release_ms: float = 100) -> np.ndarray:
-    """Vectorized single-band compressor using scipy IIR envelope follower."""
+    """Stereo-linked compressor using scipy IIR envelope follower.
+    Linked detection: max(L, R) drives both channels simultaneously
+    to prevent stereo-image pumping.
+    """
     threshold = db_to_linear(threshold_db)
     attack_coeff  = np.exp(-1.0 / (sr * attack_ms  / 1000))
     release_coeff = np.exp(-1.0 / (sr * release_ms / 1000))
 
+    # Linked stereo: single envelope from the louder channel
     if audio.ndim == 2:
-        return np.stack([
-            compress_band(audio[0], sr, threshold_db, ratio, attack_ms, release_ms),
-            compress_band(audio[1], sr, threshold_db, ratio, attack_ms, release_ms),
-        ])
-
-    level = np.abs(audio).astype(np.float32)
+        level = np.max(np.abs(audio), axis=0).astype(np.float32)
+    else:
+        level = np.abs(audio).astype(np.float32)
 
     b_att = np.array([1.0 - attack_coeff],  dtype=np.float64)
     a_att = np.array([1.0, -attack_coeff],  dtype=np.float64)
@@ -240,25 +245,39 @@ def soft_clip(x: np.ndarray, drive: float = 1.0) -> np.ndarray:
 
 
 def apply_saturation(audio: np.ndarray, sr: int, amount: float) -> np.ndarray:
-    """Subtle tape saturation on mid-lows only."""
+    """Subtle tape saturation on mid-lows with 2× oversampling to suppress aliasing.
+    Oversampling pushes tanh-generated harmonics above the new Nyquist (sr Hz)
+    where resample_poly's anti-alias FIR removes them before downsampling.
+    """
     if amount < 0.01:
         return audio
 
-    nyq = sr / 2
-    sos_low  = scipy_signal.butter(4, 5000 / nyq, btype="low",  output="sos")
-    sos_high = scipy_signal.butter(4, 5000 / nyq, btype="high", output="sos")
+    # 2× upsample before nonlinearity
+    audio_up = scipy_signal.resample_poly(audio, 2, 1).astype(np.float32)
+    nyq_up   = sr  # Nyquist at 2× original sr
 
-    if audio.ndim == 2:
-        result = np.zeros_like(audio)
+    sos_low  = scipy_signal.butter(4, 5000 / nyq_up, btype="low",  output="sos")
+    sos_high = scipy_signal.butter(4, 5000 / nyq_up, btype="high", output="sos")
+
+    if audio_up.ndim == 2:
+        result = np.zeros_like(audio_up)
         for i in range(2):
-            low_part  = scipy_signal.sosfilt(sos_low,  audio[i])
-            high_part = scipy_signal.sosfilt(sos_high, audio[i])
+            low_part  = scipy_signal.sosfilt(sos_low,  audio_up[i])
+            high_part = scipy_signal.sosfilt(sos_high, audio_up[i])
             result[i] = (soft_clip(low_part, drive=amount) + high_part).astype(np.float32)
-        return result
     else:
-        low_part  = scipy_signal.sosfilt(sos_low,  audio)
-        high_part = scipy_signal.sosfilt(sos_high, audio)
-        return (soft_clip(low_part, drive=amount) + high_part).astype(np.float32)
+        low_part  = scipy_signal.sosfilt(sos_low,  audio_up)
+        high_part = scipy_signal.sosfilt(sos_high, audio_up)
+        result = (soft_clip(low_part, drive=amount) + high_part).astype(np.float32)
+
+    # 2× downsample — resample_poly includes built-in anti-aliasing FIR
+    result = scipy_signal.resample_poly(result, 1, 2).astype(np.float32)
+    # Trim to original length (resample_poly may produce ±1 sample)
+    if audio.ndim == 2:
+        result = result[:, :audio.shape[1]]
+    else:
+        result = result[:audio.shape[0]]
+    return result
 
 
 # ─── 10. BUS COMPRESSION ───────────────────────────────────────────────────────
@@ -311,24 +330,36 @@ def apply_true_peak_limiter(audio: np.ndarray, sr: int, ceiling_db: float, targe
         1.0,
     ).astype(np.float32)
 
-    # ── 4. Smooth gain with instant attack + 50 ms release (IIR) ────────────
-    release_coeff = float(np.exp(-1.0 / (sr * 0.05)))  # τ = 50 ms
-    smoothed = np.empty_like(desired_gain)
+    # ── 4. Smooth gain at ~1 kHz (instant attack / IIR release) ─────────────
+    # Gain dynamics live at the release timescale (50 ms), not per-sample.
+    # Downsampling reduces the Python loop from ~10 M to ~240 iterations
+    # for a 4-minute track at 44.1 kHz — a ~44× speedup with no audible loss.
+    n_full = len(desired_gain)
+    ds     = max(1, sr // 1000)      # downsample factor (≈ 44 at 44.1 kHz)
+    n_ds   = n_full // ds
+
+    # Peak-hold downsample: worst-case (minimum) gain per block
+    gain_ds = desired_gain[:n_ds * ds].reshape(n_ds, ds).min(axis=1)
+
+    sr_ds      = sr / ds
+    release_ds = float(np.exp(-1.0 / (sr_ds * 0.05)))  # 50 ms τ at ds rate
+    smoothed_ds = np.empty(n_ds, dtype=np.float64)
     g = 1.0
-    for i in range(len(desired_gain)):
-        d = desired_gain[i]
+    for i in range(n_ds):
+        d = float(gain_ds[i])
         if d < g:
-            g = d                                           # Instant attack
+            g = d                                          # instant attack
         else:
-            g = release_coeff * g + (1.0 - release_coeff) * d  # Smooth release
-        smoothed[i] = g
+            g = release_ds * g + (1.0 - release_ds) * d  # IIR release
+        smoothed_ds[i] = g
 
-    # ── 5. Apply gain + hard safety clip ────────────────────────────────────
-    if audio.ndim == 2:
-        audio = (audio * smoothed).astype(np.float32)
-    else:
-        audio = (audio * smoothed).astype(np.float32)
+    # ── 5. Upsample gain to full rate (linear interpolation) ─────────────────
+    xs_ds   = np.arange(n_ds, dtype=np.float64) * ds + ds * 0.5
+    xs_full = np.arange(n_full, dtype=np.float64)
+    smoothed = np.interp(xs_full, xs_ds, smoothed_ds).astype(np.float32)
 
+    # ── 6. Apply gain + hard safety clip ─────────────────────────────────────
+    audio = (audio * smoothed).astype(np.float32)
     np.clip(audio, -ceiling_lin, ceiling_lin, out=audio)
     return audio
 
@@ -561,14 +592,16 @@ def master_audio(
     # 8. Saturation
     audio = apply_saturation(audio, sr, params.saturation_amount)
 
-    # 9. Final EQ (gentle air shelf)
-    final_board = Pedalboard([
-        HighShelfFilter(cutoff_frequency_hz=12000, gain_db=0.8, q=0.707),
-    ])
-    audio = np.stack([
-        final_board(audio[0:1].T, sr).T[0],
-        final_board(audio[1:2].T, sr).T[0],
-    ])
+    # 9. Final EQ (gentle air shelf — only when mix is thin above 12 kHz)
+    air_rms = float(pre_analysis.get("rms_air", -80.0)) if pre_analysis else -80.0
+    if air_rms < -26.0:
+        final_board = Pedalboard([
+            HighShelfFilter(cutoff_frequency_hz=12000, gain_db=0.8, q=0.707),
+        ])
+        audio = np.stack([
+            final_board(audio[0:1].T, sr).T[0],
+            final_board(audio[1:2].T, sr).T[0],
+        ])
 
     emit("limiting", 74)
 
