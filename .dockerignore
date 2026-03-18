@@ -1,0 +1,33 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Next.js build output (rebuilt inside Docker)
+.next/
+out/
+build/
+
+# Git
+.git/
+.gitignore
+
+# Env files (injected at runtime via Railway env vars)
+.env*
+
+# Uploads (mounted as Railway volume at /app/uploads)
+uploads/
+
+# Python
+python/venv/
+python/__pycache__/
+python/*.pyc
+python/*.pyo
+**/__pycache__/
+**/*.pyc
+
+# Misc
+.DS_Store
+coverage/
+*.log
+*.tsbuildinfo
+next-env.d.ts

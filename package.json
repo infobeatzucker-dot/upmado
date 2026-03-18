@@ -1,0 +1,32 @@
+{
+  "name": "masterone",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"next dev\" \"cd python && uvicorn main:app --port 8001 --reload\"",
+    "dev:next": "next dev",
+    "dev:python": "cd python && uvicorn main:app --port 8001 --reload",
+    "build": "next build",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "concurrently": "^9.2.1",
+    "framer-motion": "^12.38.0",
+    "next": "16.1.7",
+    "next-auth": "^4.24.13",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,44 @@
+import Link from "next/link";
+
+export default function Footer() {
+  return (
+    <footer
+      className="border-t py-8 px-4"
+      style={{
+        borderColor: "rgba(255,255,255,0.06)",
+        background: "var(--bg-secondary)",
+      }}
+    >
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Logo */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold">
+            <span style={{ color: "var(--accent-purple)" }}>Up</span>
+            <span style={{ color: "var(--accent-cyan)" }}>Ma</span>
+            <span style={{ color: "#f59e0b" }}>Do</span>
+          </span>
+        </div>
+
+        {/* Legal links */}
+        <div className="flex gap-5 text-xs flex-wrap justify-center" style={{ color: "var(--text-muted)" }}>
+          <Link href="/features" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Features</Link>
+          <Link href="/help" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Hilfe</Link>
+          <Link href="/impressum" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Impressum</Link>
+          <Link href="/datenschutz" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Datenschutz</Link>
+          <Link href="/agb" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>AGB</Link>
+          <Link href="/widerruf" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Widerruf</Link>
+        </div>
+
+        {/* Tech stack */}
+        <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Pedalboard · pyloudnorm · KI-Mastering
+        </div>
+      </div>
+
+      <div className="text-center text-xs mt-4" style={{ color: "var(--text-muted)" }}>
+        © {new Date().getFullYear()} UpMaDo · Michael Clas ·{" "}
+        <a href="mailto:info@re-beatz.com" style={{ color: "var(--text-muted)" }}>info@re-beatz.com</a>
+      </div>
+    </footer>
+  );
+}

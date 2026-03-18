@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sessions      Session[]
+  subscriptions Subscription[]
+  orders        Order[]
+  masters       Master[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String
+  planType             String    // "basic_monthly" | "pro_monthly" | "basic_annual" | "pro_annual"
+  paypalSubscriptionId String    @unique
+  status               String    // "active" | "cancelled" | "suspended"
+  validUntil           DateTime
+  mastersUsed          Int       @default(0)
+  mastersLimit         Int       @default(15)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  userId          String?
+  paypalOrderId   String   @unique
+  amount          Float
+  currency        String   @default("EUR")
+  status          String   // "pending" | "completed" | "refunded"
+  masterId        String?
+  downloadExpires DateTime?
+  createdAt       DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  master Master? @relation(fields: [masterId], references: [id])
+}
+
+model Master {
+  id           String   @id @default(cuid())
+  userId       String?
+  fileId       String
+  originalName String
+  platform     String
+  preset       String
+  status       String   @default("pending") // "pending" | "processing" | "done" | "error"
+
+  // Analysis results (JSON)
+  preAnalysis  String?  // JSON
+  postAnalysis String?  // JSON
+  aiParams     String?  // JSON
+
+  // Output file paths
+  pathWav32    String?
+  pathWav24    String?
+  pathWav16    String?
+  pathFlac     String?
+  pathMp3320   String?
+  pathMp3128   String?
+  pathAac256   String?
+
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orders Order[]
+}

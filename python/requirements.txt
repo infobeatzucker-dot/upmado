@@ -1,0 +1,13 @@
+fastapi>=0.104.1
+uvicorn>=0.24.0
+matchering==2.0.6
+librosa>=0.10.1
+pyloudnorm>=0.1.1
+pedalboard>=0.9.19
+scipy>=1.13.0
+numpy>=1.26.0
+soundfile>=0.12.1
+ffmpeg-python>=0.2.0
+anthropic>=0.39.0
+python-multipart>=0.0.6
+aiofiles>=23.2.1

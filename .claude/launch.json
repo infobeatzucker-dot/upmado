@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "next",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:next"],
+      "port": 3000
+    },
+    {
+      "name": "python",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:python"],
+      "port": 8001
+    }
+  ]
+}
