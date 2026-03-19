@@ -448,6 +448,7 @@ export default function Home() {
                 {/* Master NOW button */}
                 <MasterButton
                   fileId={uploadedFile.file_id}
+                  originalName={uploadedFile.filename}
                   platform={platform}
                   preset={preset}
                   intensity={intensity}

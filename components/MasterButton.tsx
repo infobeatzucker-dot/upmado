@@ -5,6 +5,7 @@ import { Platform, Preset, MasterData, ProgressStep, AnalysisData } from "@/app/
 
 interface Props {
   fileId: string;
+  originalName?: string;      // original filename for mastering history
   platform: Platform;
   preset: Preset;
   intensity: number;          // 0–100
@@ -31,7 +32,7 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 export default function MasterButton({
-  fileId, platform, preset, intensity, selectedFormat,
+  fileId, originalName, platform, preset, intensity, selectedFormat,
   analysis,
   referenceAnalysis,
   isProcessing, onStart, onProgress, onComplete, onError,
@@ -76,7 +77,7 @@ export default function MasterButton({
       const response = await fetch("/api/master", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId, platform, preset, intensity, format: selectedFormat, analysis, reference_analysis: referenceAnalysis }),
+        body: JSON.stringify({ file_id: fileId, original_name: originalName, platform, preset, intensity, format: selectedFormat, analysis, reference_analysis: referenceAnalysis }),
         signal: controller.signal,
       });
       if (!response.ok || !response.body) { onError(); return; }

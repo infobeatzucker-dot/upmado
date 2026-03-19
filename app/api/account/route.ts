@@ -37,8 +37,8 @@ export async function GET() {
   // Parse LUFS from analysis JSON
   const mastersWithLufs = user.masters.map((m: typeof user.masters[number]) => {
     let lufsIn = null, lufsOut = null;
-    try { const pre = JSON.parse(m.preAnalysis ?? "{}"); lufsIn = pre.integrated_loudness ?? null; } catch {}
-    try { const post = JSON.parse(m.postAnalysis ?? "{}"); lufsOut = post.integrated_loudness ?? null; } catch {}
+    try { const pre = JSON.parse(m.preAnalysis ?? "{}"); lufsIn = pre.integrated_lufs ?? pre.integrated_loudness ?? null; } catch {}
+    try { const post = JSON.parse(m.postAnalysis ?? "{}"); lufsOut = post.integrated_lufs ?? post.integrated_loudness ?? null; } catch {}
     return { id: m.id, originalName: m.originalName, platform: m.platform,
              preset: m.preset, status: m.status, lufsIn, lufsOut,
              createdAt: m.createdAt };

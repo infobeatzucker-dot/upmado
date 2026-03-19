@@ -43,6 +43,18 @@ export default function AccountPage() {
 
   const [data, setData]           = useState<AccountData | null>(null);
   const [loading, setLoading]     = useState(true);
+  const [subscribedToast, setSubscribedToast] = useState(false);
+
+  // Show success toast if redirected from PayPal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("subscribed") === "1") {
+      setSubscribedToast(true);
+      // Clean up URL
+      window.history.replaceState({}, "", "/account");
+      setTimeout(() => setSubscribedToast(false), 6000);
+    }
+  }, []);
 
   // Name edit
   const [editName, setEditName]   = useState("");
@@ -141,6 +153,21 @@ export default function AccountPage() {
   return (
     <div style={{ background: "var(--bg-primary)", minHeight: "100vh" }}>
       <Header />
+
+      {/* Subscription success toast */}
+      {subscribedToast && (
+        <div style={{
+          position: "fixed", top: "4.5rem", left: "50%", transform: "translateX(-50%)",
+          zIndex: 100, background: "rgba(0,229,196,0.15)",
+          border: "1px solid rgba(0,229,196,0.4)", borderRadius: "12px",
+          padding: "0.75rem 1.5rem", backdropFilter: "blur(12px)",
+          color: "var(--accent-cyan)", fontWeight: 600, fontSize: "0.9rem",
+          boxShadow: "0 4px 24px rgba(0,229,196,0.2)",
+        }}>
+          ✓ Abo erfolgreich aktiviert! Dein Plan wird gleich aktualisiert.
+        </div>
+      )}
+
       <main style={{ maxWidth: "720px", margin: "0 auto", padding: "6rem 1.5rem 4rem" }}>
 
         {/* Hero */}
