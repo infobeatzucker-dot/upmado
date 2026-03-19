@@ -13,7 +13,7 @@ export default function Header() {
   const [authOpen, setAuthOpen]   = useState(false);
   const [resetToken, setResetToken] = useState<string | undefined>();
 
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -88,38 +88,38 @@ export default function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {!isLoading && (
-              session
-                ? <AccountDropdown />
-                : (
-                  <>
-                    <button
-                      onClick={() => setAuthOpen(true)}
-                      className="hidden md:block text-sm px-3 py-1.5 rounded-lg transition-all font-medium"
-                      style={{
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        color: "var(--text-secondary)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Anmelden
-                    </button>
-                    <Link
-                      href="/pricing"
-                      className="hidden md:block text-sm px-3 py-1.5 rounded-lg transition-all hover:opacity-90 font-semibold"
-                      style={{
-                        background: "linear-gradient(135deg, var(--accent-purple), var(--accent-cyan))",
-                        color: "#fff",
-                        textDecoration: "none",
-                        boxShadow: "0 0 16px rgba(124,111,255,0.25)",
-                      }}
-                    >
-                      Pro holen
-                    </Link>
-                  </>
-                )
-            )}
+            {/* Show session-aware content; during loading show guest buttons as fallback */}
+            {session
+              ? <AccountDropdown />
+              : (
+                <>
+                  <button
+                    onClick={() => setAuthOpen(true)}
+                    className="hidden md:block text-sm px-3 py-1.5 rounded-lg transition-all font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Anmelden
+                  </button>
+                  <Link
+                    href="/pricing"
+                    className="hidden md:block text-sm px-3 py-1.5 rounded-lg transition-all hover:opacity-90 font-semibold"
+                    style={{
+                      background: "linear-gradient(135deg, var(--accent-purple), var(--accent-cyan))",
+                      color: "#fff",
+                      textDecoration: "none",
+                      boxShadow: "0 0 16px rgba(124,111,255,0.25)",
+                    }}
+                  >
+                    Pro holen
+                  </Link>
+                </>
+              )
+            }
 
             {/* Mobile hamburger */}
             <button
