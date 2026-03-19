@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CookieReopenButton from "./CookieReopenButton";
 
 export default function Footer() {
   return (
@@ -27,6 +28,7 @@ export default function Footer() {
           <Link href="/datenschutz" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Datenschutz</Link>
           <Link href="/agb" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>AGB</Link>
           <Link href="/widerruf" className="hover:text-white transition-colors" style={{ color: "inherit", textDecoration: "none" }}>Widerruf</Link>
+          <span style={{ color: "inherit" }}><CookieReopenButton /></span>
         </div>
 
         {/* Tech stack */}
