@@ -8,16 +8,51 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  name        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  name                 String?
+  image                String?   // Google profile picture
+  emailVerified        DateTime? // Required by NextAuth
+  password             String?   // bcrypt hash (null for Google-only accounts)
+  passwordResetToken   String?   @unique
+  passwordResetExpires DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
+  accounts      Account[]
   sessions      Session[]
   subscriptions Subscription[]
   orders        Order[]
   masters       Master[]
+}
+
+// NextAuth OAuth account linking (Google etc.)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// NextAuth email verification tokens
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model Session {
@@ -33,12 +68,15 @@ model Session {
 model Subscription {
   id                   String    @id @default(cuid())
   userId               String
-  planType             String    // "basic_monthly" | "pro_monthly" | "basic_annual" | "pro_annual"
+  // Plan types: free | ppu | creator_monthly | creator_annual |
+  //             pro_monthly | pro_annual | proplus_monthly | proplus_annual |
+  //             studio_monthly | studio_annual
+  planType             String
   paypalSubscriptionId String    @unique
   status               String    // "active" | "cancelled" | "suspended"
   validUntil           DateTime
   mastersUsed          Int       @default(0)
-  mastersLimit         Int       @default(15)
+  mastersLimit         Int       @default(25)
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -46,15 +84,15 @@ model Subscription {
 }
 
 model Order {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String?
-  paypalOrderId   String   @unique
+  paypalOrderId   String    @unique
   amount          Float
-  currency        String   @default("EUR")
-  status          String   // "pending" | "completed" | "refunded"
+  currency        String    @default("EUR")
+  status          String    // "pending" | "completed" | "refunded"
   masterId        String?
   downloadExpires DateTime?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime  @default(now())
 
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   master Master? @relation(fields: [masterId], references: [id])
@@ -69,12 +107,12 @@ model Master {
   preset       String
   status       String   @default("pending") // "pending" | "processing" | "done" | "error"
 
-  // Analysis results (JSON)
-  preAnalysis  String?  // JSON
-  postAnalysis String?  // JSON
-  aiParams     String?  // JSON
+  // Analysis results (JSON strings)
+  preAnalysis  String?
+  postAnalysis String?
+  aiParams     String?
 
-  // Output file paths
+  // Output file paths (valid for 2h after processing)
   pathWav32    String?
   pathWav24    String?
   pathWav16    String?
@@ -83,9 +121,9 @@ model Master {
   pathMp3128   String?
   pathAac256   String?
 
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   orders Order[]

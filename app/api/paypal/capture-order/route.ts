@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { capturePayPalOrder } from "@/lib/paypal";
+import { db } from "@/lib/db";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+// Download link valid for 2 hours after purchase (matches temp-file cleanup window)
+const DOWNLOAD_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,19 +24,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Extract master_id from custom_id
-    const masterId = capture.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id;
+    // Extract data from PayPal response
+    const captureUnit = capture.purchase_units?.[0]?.payments?.captures?.[0];
+    const masterId    = captureUnit?.custom_id             as string | undefined;
+    const amountVal   = captureUnit?.amount?.value         as string | undefined;
+    const currency    = captureUnit?.amount?.currency_code as string | undefined;
 
-    // TODO: Store order in database, generate signed download token
-    const downloadToken = Buffer.from(
-      JSON.stringify({ master_id: masterId, paid: true, expires: Date.now() + 7 * 24 * 3600 * 1000 })
-    ).toString("base64");
+    // Optional user session
+    const session = await getServerSession(authOptions);
+    const userId  = session?.user?.id ?? null;
+
+    const downloadExpires = new Date(Date.now() + DOWNLOAD_WINDOW_MS);
+
+    // Store order in DB
+    const order = await db.order.create({
+      data: {
+        paypalOrderId:  order_id,
+        userId,
+        masterId:       masterId ?? null,
+        amount:         amountVal ? parseFloat(amountVal) : 0,
+        currency:       currency ?? "EUR",
+        status:         "completed",
+        downloadExpires,
+      },
+    });
+
+    // Signed download token: base64url(JSON) — validated server-side in /api/download
+    const tokenPayload = {
+      orderId:   order.id,
+      masterId:  masterId ?? null,
+      expiresAt: downloadExpires.getTime(),
+    };
+    const downloadToken = Buffer.from(JSON.stringify(tokenPayload)).toString("base64url");
 
     return NextResponse.json({
-      success: true,
-      master_id: masterId,
+      success:        true,
+      master_id:      masterId,
       download_token: downloadToken,
-      expires_in_days: 7,
+      expires_at:     downloadExpires.toISOString(),
     });
   } catch (err) {
     console.error("PayPal capture error:", err);

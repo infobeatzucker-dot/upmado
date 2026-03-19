@@ -83,10 +83,14 @@ export async function capturePayPalOrder(orderId: string) {
 // ─── Subscriptions ─────────────────────────────────────────────────────────
 
 const PLAN_IDS: Record<string, string> = {
-  basic_monthly:  process.env.PAYPAL_PLAN_BASIC_MONTHLY  || "",
-  pro_monthly:    process.env.PAYPAL_PLAN_PRO_MONTHLY    || "",
-  basic_annual:   process.env.PAYPAL_PLAN_BASIC_ANNUAL   || "",
-  pro_annual:     process.env.PAYPAL_PLAN_PRO_ANNUAL     || "",
+  creator_monthly: process.env.PAYPAL_PLAN_CREATOR_MONTHLY || "",
+  creator_annual:  process.env.PAYPAL_PLAN_CREATOR_ANNUAL  || "",
+  pro_monthly:     process.env.PAYPAL_PLAN_PRO_MONTHLY     || "",
+  pro_annual:      process.env.PAYPAL_PLAN_PRO_ANNUAL      || "",
+  proplus_monthly: process.env.PAYPAL_PLAN_PROPLUS_MONTHLY || "",
+  proplus_annual:  process.env.PAYPAL_PLAN_PROPLUS_ANNUAL  || "",
+  studio_monthly:  process.env.PAYPAL_PLAN_STUDIO_MONTHLY  || "",
+  studio_annual:   process.env.PAYPAL_PLAN_STUDIO_ANNUAL   || "",
 };
 
 export async function createPayPalSubscription(planType: string, userId?: string) {

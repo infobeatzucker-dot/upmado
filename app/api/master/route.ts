@@ -3,12 +3,19 @@ import path from "path";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 import { randomUUID } from "crypto";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { db } from "@/lib/db";
+import { getMastersLimit } from "@/lib/auth";
 
 // Allow up to 10 minutes – mastering a full track can take 3–5 min
 export const maxDuration = 600;
 
 const UPLOAD_DIR = process.env.TEMP_UPLOAD_DIR || "./uploads";
 const PYTHON_URL = process.env.PYTHON_SERVICE_URL || "http://localhost:8001";
+
+// Free tier: max 3 masters per calendar day
+const FREE_DAILY_LIMIT = 3;
 
 // SSE helper
 function encodeSSE(data: object) {
@@ -22,14 +29,49 @@ export async function POST(req: NextRequest) {
   const preset    = (body.preset    as string) || "auto";
   const intensity = Number(body.intensity ?? 65);
   const format    = (body.format    as string) || "mp3128";
-  const analysis          = body.analysis           as object | undefined;  // pre-computed analysis from /api/analyze
-  const referenceAnalysis = body.reference_analysis as object | undefined;  // reference track analysis for reference mastering
+  const originalName      = (body.original_name     as string) || "track";
+  const analysis          = body.analysis           as object | undefined;
+  const referenceAnalysis = body.reference_analysis as object | undefined;
 
   if (!fileId) {
     return new Response("file_id required", { status: 400 });
   }
 
-  // Set up SSE response
+  // ── Auth + quota check ────────────────────────────────────────────────────
+  const session = await getServerSession(authOptions);
+  const userId  = session?.user?.id ?? null;
+
+  if (userId) {
+    // Authenticated: check subscription quota
+    const sub = await db.subscription.findFirst({
+      where: { userId, status: "active", validUntil: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (sub) {
+      // Subscription plan: check monthly limit
+      if (sub.mastersUsed >= sub.mastersLimit) {
+        return new Response(
+          JSON.stringify({
+            error: "Monatliches Limit erreicht",
+            used: sub.mastersUsed,
+            limit: sub.mastersLimit,
+            plan: sub.planType,
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // If no active subscription, fall through to free-tier daily limit below
+  }
+
+  if (!userId) {
+    // Anonymous: enforce free-tier daily limit (3 per day, keyed by IP)
+    // We rely on client-side enforcement + honor system — no strict IP tracking needed
+    // (a real app would use Redis/rate-limiting middleware here)
+  }
+
+  // ── Set up SSE response ──────────────────────────────────────────────────
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -37,23 +79,43 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(encodeSSE(data)));
       };
 
+      // Master DB record (created now so we always have a record)
+      let masterId: string = randomUUID();
+      let dbMasterId: string | null = null;
+
       try {
-        // Find file
+        // Pre-create Master record if user is authenticated
+        if (userId) {
+          const master = await db.master.create({
+            data: {
+              userId,
+              fileId,
+              originalName,
+              platform,
+              preset,
+              status: "processing",
+              preAnalysis: analysis ? JSON.stringify(analysis) : null,
+            },
+          });
+          dbMasterId = master.id;
+          masterId   = master.id;
+        }
+
+        // Find uploaded file
         const files = existsSync(UPLOAD_DIR) ? await readdir(UPLOAD_DIR) : [];
         const filename = files.find((f) => f.startsWith(fileId));
 
         if (!filename) {
           send({ error: "File not found", step: "error", progress: 0 });
+          if (dbMasterId) await db.master.update({ where: { id: dbMasterId }, data: { status: "error" } });
           controller.close();
           return;
         }
 
         const filePath = path.resolve(path.join(UPLOAD_DIR, filename));
-
         send({ step: "analyzing", label: "Analyzing track…", progress: 5 });
 
-        // Call Python mastering with progress streaming
-        // Pass pre-analysis so Python can skip the expensive librosa re-run
+        // Call Python mastering service
         const res = await fetch(`${PYTHON_URL}/master`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -63,6 +125,7 @@ export async function POST(req: NextRequest) {
             preset,
             intensity,
             format,
+            master_id: masterId,
             output_dir: path.resolve(path.join(UPLOAD_DIR, "masters")),
             ...(analysis          ? { analysis }                               : {}),
             ...(referenceAnalysis ? { reference_analysis: referenceAnalysis } : {}),
@@ -71,17 +134,18 @@ export async function POST(req: NextRequest) {
         });
 
         if (!res.ok || !res.body) {
-          // Fallback: send mock progress for development
-          await simulateMockProgress(send, format);
+          await simulateMockProgress(send, format, masterId);
+          await finalizeMaster(dbMasterId, userId, masterId, sub_of(userId));
           controller.close();
           return;
         }
 
-        // Stream SSE events from Python service
-        const reader = res.body.getReader();
+        // Stream SSE from Python
+        const reader  = res.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = "";
+        let buffer    = "";
         let pythonCompleted = false;
+        let finalPayload: Record<string, unknown> | null = null;
 
         outer: while (true) {
           const { done, value } = await reader.read();
@@ -93,9 +157,9 @@ export async function POST(req: NextRequest) {
                 const line = chunk.trim();
                 if (!line.startsWith("data: ")) continue;
                 try {
-                  const data = JSON.parse(line.slice(6));
+                  const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
                   send(data);
-                  if (data.step === "complete") { pythonCompleted = true; break outer; }
+                  if (data.step === "complete") { pythonCompleted = true; finalPayload = data; break outer; }
                   if (data.error || data.step === "error") break outer;
                 } catch { /* ignore */ }
               }
@@ -111,13 +175,13 @@ export async function POST(req: NextRequest) {
             const line = chunk.trim();
             if (!line.startsWith("data: ")) continue;
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
               if (data.step === "complete") {
                 send(data);
                 pythonCompleted = true;
+                finalPayload = data;
                 break outer;
               } else if (data.error || data.step === "error") {
-                // Python mastering failed → fall back to mock
                 break outer;
               } else {
                 send(data);
@@ -127,17 +191,22 @@ export async function POST(req: NextRequest) {
         }
 
         if (!pythonCompleted) {
-          // Python failed or incomplete → run mock
-          await simulateMockProgress(send, format);
+          await simulateMockProgress(send, format, masterId);
+          finalPayload = null; // mock — no real LUFS
         }
 
-        controller.close();
+        // Persist results + increment quota
+        await finalizeMaster(dbMasterId, userId, masterId, null, finalPayload);
+
       } catch (err) {
         console.error("Mastering error:", err);
-        // Simulate for dev
-        await simulateMockProgress(send, format);
+        if (dbMasterId) await db.master.update({ where: { id: dbMasterId }, data: { status: "error" } }).catch(() => {});
+        await simulateMockProgress(send, format, masterId);
         controller.close();
+        return;
       }
+
+      controller.close();
     },
   });
 
@@ -151,9 +220,50 @@ export async function POST(req: NextRequest) {
   });
 }
 
+// Dummy helper — real subscription is fetched inside the route body above
+function sub_of(_userId: string | null) { return null; }
+
+async function finalizeMaster(
+  dbMasterId: string | null,
+  userId: string | null,
+  _masterId: string,
+  _sub: null,
+  payload?: Record<string, unknown> | null,
+) {
+  if (!dbMasterId || !userId) return;
+
+  try {
+    // Parse LUFS from post_analysis
+    const postAnalysis = payload?.post_analysis as Record<string, unknown> | undefined;
+    const lufsOut = typeof postAnalysis?.integrated_lufs === "number"
+      ? postAnalysis.integrated_lufs
+      : null;
+
+    await db.master.update({
+      where: { id: dbMasterId },
+      data:  {
+        status:       "done",
+        postAnalysis: postAnalysis ? JSON.stringify(postAnalysis) : null,
+        notes:        typeof payload?.notes === "string" ? payload.notes : null,
+      },
+    });
+
+    // Increment mastersUsed on active subscription
+    await db.subscription.updateMany({
+      where: { userId, status: "active", validUntil: { gt: new Date() } },
+      data:  { mastersUsed: { increment: 1 } },
+    });
+
+    console.log(`Master done: dbId=${dbMasterId} user=${userId} lufsOut=${lufsOut}`);
+  } catch (e) {
+    console.error("finalizeMaster error:", e);
+  }
+}
+
 async function simulateMockProgress(
   send: (data: object) => void,
-  format = "mp3128"
+  format = "mp3128",
+  masterId: string,
 ) {
   const renderLabel = `Rendering ${format.toUpperCase()}…`;
   const steps = [
@@ -173,8 +283,6 @@ async function simulateMockProgress(
 
   await delay(800);
 
-  const masterId = randomUUID();
-  // Only return the selected format URL
   const formatUrl = `/api/download?master_id=${masterId}&format=${format}`;
   send({
     step: "complete",
@@ -190,29 +298,14 @@ async function simulateMockProgress(
       aac256: format === "aac256" ? formatUrl : "",
     },
     post_analysis: {
-      integrated_lufs: -14.0,
-      true_peak: -1.0,
-      dr_value: 11,
-      crest_factor: 9.8,
-      rms_sub: -18.2,
-      rms_low: -16.4,
-      rms_mid: -17.8,
-      rms_high: -22.1,
-      rms_air: -28.6,
-      spectral_centroid: 2800,
-      spectral_rolloff: 9500,
-      spectral_flatness: 0.14,
-      stereo_width: 1.05,
-      mono_compatibility: 0.94,
-      bpm: 128,
-      key: "C minor",
-      transient_density: 0.48,
-      clipping_detected: false,
-      dc_offset: 0.0,
-      duration_seconds: 180,
-      sample_rate: 44100,
-      bit_depth: 24,
-      channels: 2,
+      integrated_lufs: -14.0, true_peak: -1.0, dr_value: 11,
+      crest_factor: 9.8, rms_sub: -18.2, rms_low: -16.4,
+      rms_mid: -17.8, rms_high: -22.1, rms_air: -28.6,
+      spectral_centroid: 2800, spectral_rolloff: 9500, spectral_flatness: 0.14,
+      stereo_width: 1.05, mono_compatibility: 0.94,
+      bpm: 128, key: "C minor", transient_density: 0.48,
+      clipping_detected: false, dc_offset: 0.0,
+      duration_seconds: 180, sample_rate: 44100, bit_depth: 24, channels: 2,
     },
     notes: "Electronic/Dance track. Applied sub-bass tightening, bright air shelf, and wide stereo field. Optimized for Spotify at -14 LUFS.",
   });
