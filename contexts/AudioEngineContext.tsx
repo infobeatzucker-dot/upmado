@@ -62,10 +62,12 @@ export function AudioEngineProvider({
   originalUrl: string;
   masteredUrl: string;
 }) {
-  const audioRef       = useRef<HTMLAudioElement | null>(null);
-  const audioCtxRef    = useRef<AudioContext | null>(null);
-  const gainRef        = useRef<GainNode | null>(null);
-  const rafRef         = useRef<number>(0);
+  const audioRef          = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef       = useRef<AudioContext | null>(null);
+  const gainRef           = useRef<GainNode | null>(null);
+  const rafRef            = useRef<number>(0);
+  const masteredBlobRef   = useRef<string>("");   // Blob URL for reliable B seeking
+  const modeRef           = useRef<"A" | "B">("A");
 
   const [analyserMono, setAnalyserMono] = useState<AnalyserNode | null>(null);
   const [analyserL,    setAnalyserL]    = useState<AnalyserNode | null>(null);
@@ -81,6 +83,9 @@ export function AudioEngineProvider({
   const [peakWaveform,    setPeakWaveform]    = useState<Float32Array | null>(null);
   const [staticWaveformB, setStaticWaveformB] = useState<Float32Array | null>(null);
   const [peakWaveformB,   setPeakWaveformB]   = useState<Float32Array | null>(null);
+
+  // Keep modeRef in sync with state so setMode closure always sees latest value
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   // ── Create audio element ────────────────────────────────────────────────────
   useEffect(() => {
@@ -164,19 +169,52 @@ export function AudioEngineProvider({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [originalUrl]);
 
-  // ── When masteredUrl becomes available: unlock B + decode B waveform ─────────
+  // ── When masteredUrl becomes available: pre-fetch as Blob (enables seeking) ──
   useEffect(() => {
     if (!masteredUrl) return;
 
-    // Unlock B button whenever a real master URL arrives
     setMasterUnavailable(false);
 
+    // Fetch as blob so the audio element can seek regardless of server Range support
+    fetch(masteredUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
+        // Revoke old blob URL if any
+        if (masteredBlobRef.current) URL.revokeObjectURL(masteredBlobRef.current);
+        masteredBlobRef.current = URL.createObjectURL(blob);
+
+        // If currently in B mode, hot-swap to blob URL preserving position
+        const audio = audioRef.current;
+        if (audio && modeRef.current === "B") {
+          const ct = audio.currentTime;
+          const wasPlaying = !audio.paused;
+          audio.pause();
+          audio.src = masteredBlobRef.current;
+          audio.load();
+          audio.addEventListener("loadedmetadata", () => {
+            audio.currentTime = ct;
+          }, { once: true });
+          audio.addEventListener("canplay", () => {
+            if (wasPlaying) audio.play().catch(() => {});
+          }, { once: true });
+        }
+      })
+      .catch(() => { /* fallback: use original URL, seeking may not work */ });
+
+    // Decode waveform for visualizer
     decodeWaveform(masteredUrl).then((result) => {
       if (result) {
         setStaticWaveformB(result.rms);
         setPeakWaveformB(result.peaks);
       }
     });
+
+    return () => {
+      if (masteredBlobRef.current) {
+        URL.revokeObjectURL(masteredBlobRef.current);
+        masteredBlobRef.current = "";
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [masteredUrl]);
 
@@ -247,17 +285,26 @@ export function AudioEngineProvider({
     const doSwitch = () => {
       audio.pause();
 
-      const url = newMode === "A" ? originalUrl : masteredUrl;
+      // Use pre-fetched Blob URL for B (enables seeking); fall back to server URL
+      const url = newMode === "A"
+        ? originalUrl
+        : (masteredBlobRef.current || masteredUrl);
       if (!url) return;
 
       audio.src = url;
       audio.load();
 
+      // Restore playback position as soon as metadata is parsed (before canplay)
+      if (time > 0) {
+        audio.addEventListener("loadedmetadata", () => {
+          audio.currentTime = time;
+        }, { once: true });
+      }
+
       audio.addEventListener("canplay", () => {
-        audio.currentTime = time;
         if (wasPlaying) {
           audio.play().catch(() => {});
-          // Fade back in over 80 ms once the new source starts
+          // Fade back in over 80 ms
           const gain = gainRef.current;
           const ctx  = audioCtxRef.current;
           if (gain && ctx) {

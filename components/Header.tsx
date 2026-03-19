@@ -69,6 +69,7 @@ export default function Header() {
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6">
             {[
+              { label: "Home", href: "/" },
               { label: "Features", href: "/features" },
               { label: "Hilfe", href: "/help" },
               { label: "Preise", href: "/pricing" },
@@ -153,6 +154,7 @@ export default function Header() {
             >
               <div className="px-4 py-5 flex flex-col gap-4">
                 {[
+                  { label: "Home", href: "/" },
                   { label: "Features", href: "/features" },
                   { label: "Hilfe", href: "/help" },
                   { label: "Preise", href: "/pricing" },
