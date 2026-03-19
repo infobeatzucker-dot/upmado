@@ -31,8 +31,6 @@ export default function Header() {
     }
   }, []);
 
-  const isLoading = status === "loading";
-
   return (
     <>
       <header

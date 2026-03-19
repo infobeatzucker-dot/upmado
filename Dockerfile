@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+# OpenSSL required by Prisma client at build time
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 RUN npx prisma generate
 RUN npm run build
