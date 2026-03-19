@@ -93,7 +93,7 @@ export default function Header() {
                 <>
                   <button
                     onClick={() => setAuthOpen(true)}
-                    className="hidden md:block text-sm px-3 py-1.5 rounded-lg transition-all font-medium"
+                    className="text-sm px-3 py-1.5 rounded-lg transition-all font-medium"
                     style={{
                       background: "rgba(255,255,255,0.06)",
                       border: "1px solid rgba(255,255,255,0.12)",
@@ -105,7 +105,7 @@ export default function Header() {
                   </button>
                   <Link
                     href="/pricing"
-                    className="hidden md:block text-sm px-3 py-1.5 rounded-lg transition-all hover:opacity-90 font-semibold"
+                    className="hidden sm:block text-sm px-3 py-1.5 rounded-lg transition-all hover:opacity-90 font-semibold"
                     style={{
                       background: "linear-gradient(135deg, var(--accent-purple), var(--accent-cyan))",
                       color: "#fff",
