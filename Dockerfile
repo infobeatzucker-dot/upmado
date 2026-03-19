@@ -42,18 +42,23 @@ COPY --from=node-builder /app/.next/standalone ./
 COPY --from=node-builder /app/.next/static  ./.next/static
 COPY --from=node-builder /app/public        ./public
 
-# ── Prisma (SQLite client needed by Next.js at runtime) ───────────────────────
+# ── Prisma (client + CLI needed at runtime for db push) ──────────────────────
 COPY prisma ./prisma
 COPY --from=node-builder /app/node_modules/.prisma  ./node_modules/.prisma
 COPY --from=node-builder /app/node_modules/@prisma  ./node_modules/@prisma
+COPY --from=node-builder /app/node_modules/prisma   ./node_modules/prisma
 
 # ── Supervisord config ────────────────────────────────────────────────────────
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# ── Persistent storage dir (overridden by Railway volume at /app/uploads) ─────
+# ── Startup script (runs prisma db push, then supervisord) ────────────────────
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
+
+# ── Persistent storage dir (overridden by volume at /app/uploads) ─────────────
 RUN mkdir -p /app/uploads/masters
 
 EXPOSE 3000
 
-# supervisord -n = no-daemon (keeps it in foreground, forwards logs to stdout)
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# start.sh: runs prisma db push, then starts supervisord
+CMD ["./start.sh"]
