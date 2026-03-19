@@ -32,7 +32,7 @@ export async function cleanupFile(filePath: string) {
   }
 }
 
-export async function cleanupOldFiles(maxAgeMs = 24 * 60 * 60 * 1000) {
+export async function cleanupOldFiles(maxAgeMs = 2 * 60 * 60 * 1000) {
   if (!existsSync(UPLOAD_DIR)) return;
   const now = Date.now();
   const files = await readdir(UPLOAD_DIR, { withFileTypes: true });

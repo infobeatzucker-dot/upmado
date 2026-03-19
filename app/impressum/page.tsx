@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function ImpressumPage() {
   return (
-    <LegalLayout title="Impressum">
+    <LegalLayout title="Impressum" activePage="impressum">
       <div className="legal-section">
         <h2>Angaben gem. § 5 DDG</h2>
         <p>
