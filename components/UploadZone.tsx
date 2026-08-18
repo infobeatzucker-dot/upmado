@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { signIn } from "next-auth/react";
 import { AppState, AnalysisData, UploadedFile } from "@/app/page";
 
 interface Props {
@@ -11,6 +10,7 @@ interface Props {
   uploadedFile: UploadedFile | null;
   isAuthenticated?: boolean;
   lang?: "de" | "en";
+  onSignInClick?: () => void;
 }
 
 const ACCEPTED_FORMATS = [".wav", ".flac", ".mp3", ".aiff", ".ogg", ".m4a"];
@@ -62,6 +62,7 @@ export default function UploadZone({
   uploadedFile,
   isAuthenticated = false,
   lang = "de",
+  onSignInClick,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -341,7 +342,7 @@ export default function UploadZone({
           {lang === "de" ? "Erstelle ein kostenloses Konto und mastere deine Tracks" : "Create a free account to start mastering your tracks"}
         </p>
         <button
-          onClick={() => signIn()}
+          onClick={() => onSignInClick?.()}
           className="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
           style={{
             background: "linear-gradient(135deg, var(--accent-purple), #5a4fd0)",

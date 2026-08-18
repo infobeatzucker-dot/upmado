@@ -20,6 +20,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import MasteringProgressModal from "@/components/MasteringProgressModal";
 import PromoPopup from "@/components/PromoPopup";
 import BeforeAfterConsole from "@/components/BeforeAfterConsole";
+import AuthModal from "@/components/AuthModal";
 import { AudioEngineProvider, useAudioEngine } from "@/contexts/AudioEngineContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { DAILY_MASTER_LIMIT } from "@/lib/constants";
@@ -180,6 +181,7 @@ export default function Home() {
   const [selectedFormat,   setSelectedFormat]   = useState<string>("mp3128");
   const [referenceAnalysis, setReferenceAnalysis] = useState<AnalysisData | null>(null);
   const [savedRefs, setSavedRefs] = useState<SavedRef[]>([]);
+  const [authOpen, setAuthOpen] = useState(false);
 
   // Scroll targets
   const mainPanelRef  = useRef<HTMLDivElement>(null);
@@ -483,7 +485,7 @@ export default function Home() {
                 <AnimatePresence mode="wait">
                   {(appState === "idle" || appState === "uploaded" || appState === "analyzing") ? (
                     <motion.div key="upload-deck" initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }} className="precision-deck-upload">
-                      <UploadZone lang={lang} onUploadComplete={handleUploadComplete} onAnalysisComplete={handleAnalysisComplete} setAppState={setAppState} uploadedFile={uploadedFile} isAuthenticated={sessionStatus === "authenticated"} />
+                      <UploadZone lang={lang} onUploadComplete={handleUploadComplete} onAnalysisComplete={handleAnalysisComplete} setAppState={setAppState} uploadedFile={uploadedFile} isAuthenticated={sessionStatus === "authenticated"} onSignInClick={() => setAuthOpen(true)} />
                     </motion.div>
                   ) : (
                     <motion.div key="track-ready" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="precision-track-ready">
@@ -688,6 +690,7 @@ export default function Home() {
       <Footer />
       <ScrollToTop />
       <PromoPopup />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }
