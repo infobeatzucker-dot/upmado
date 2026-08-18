@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import LegalLayout from "@/app/components/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Impressum – UpMaDo",
+  title: { absolute: "Impressum – UpMaDo" },
   description: "Impressum und Anbieterkennzeichnung von UpMaDo gemäß §5 TMG — Anbieter, Kontakt und rechtliche Hinweise zum kostenlosen Mastering-Dienst.",
   robots: { index: true, follow: true },
   alternates: { canonical: "https://upmado.com/impressum" },

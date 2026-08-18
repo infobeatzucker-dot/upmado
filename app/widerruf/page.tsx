@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import LegalLayout from "@/app/components/LegalLayout";
 
 export const metadata: Metadata = {
-  title: "Widerrufsbelehrung – UpMaDo",
+  title: { absolute: "Widerrufsbelehrung – UpMaDo" },
   description: "Widerrufsbelehrung für den kostenlosen Audio-Mastering-Dienst UpMaDo — als Gratis-Angebot ist kein gesetzliches Widerrufsrecht anwendbar.",
   alternates: { canonical: "https://upmado.com/widerruf" },
   robots: { index: true, follow: true },
