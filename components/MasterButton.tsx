@@ -23,6 +23,7 @@ interface Props {
 
 const STEP_LABELS: Record<string, string> = {
   analyzing:   "Analyzing track…",
+  loading:     "Loading track…",
   eq:          "Applying EQ correction…",
   compression: "Multiband compression…",
   ms:          "M/S processing…",
