@@ -14,7 +14,7 @@ function generateWaveform(samples: number, seed: number): Float32Array {
     const x        = i / samples;
     const main     = Math.sin(x * Math.PI * 6 + seed) * 0.6;
     const harmony  = Math.sin(x * Math.PI * 14 + seed * 0.7) * 0.25;
-    const detail   = (Math.random() - 0.5) * 0.15;
+    const detail   = Math.sin(x * Math.PI * 47 + seed * 0.31) * 0.075;
     const envelope = Math.sin(x * Math.PI);
     data[i] = (main + harmony + detail) * envelope;
   }
@@ -74,8 +74,8 @@ export default function WaveformViewer({ isProcessing, hasPostData, analyser }: 
           ctx.globalAlpha = 1;
         };
 
-        drawReal("#7c6fff", 0.6);
-        if (hasPostData) drawReal("#00e5c4", 0.8, 1.3);
+        drawReal("#f2a65a", 0.62);
+        if (hasPostData) drawReal("#58e0b5", 0.82, 1.3);
       } else {
         // ── Static simulation ────────────────────────────────────
         const preWave = preWaveRef.current;
@@ -109,10 +109,10 @@ export default function WaveformViewer({ isProcessing, hasPostData, analyser }: 
           void step;
         };
 
-        drawWave(preWave, "#7c6fff", 0.7);
+        drawWave(preWave, "#f2a65a", 0.7);
         if (hasPostData || isProcessing) {
           const gain = hasPostData ? 1.4 : 1.0 + Math.abs(Math.sin(t * 2)) * 0.4;
-          drawWave(preWave, "#00e5c4", hasPostData ? 0.8 : 0.4, gain);
+          drawWave(preWave, "#58e0b5", hasPostData ? 0.8 : 0.4, gain);
         }
 
         // Idle playhead
@@ -127,7 +127,7 @@ export default function WaveformViewer({ isProcessing, hasPostData, analyser }: 
       if (!analyser) {
         const wave = preWaveRef.current;
         if (wave) {
-          ctx.strokeStyle = "rgba(0,229,196,0.25)";
+          ctx.strokeStyle = "rgba(88,224,181,0.25)";
           ctx.lineWidth   = 1;
           ctx.beginPath();
           const ws = Math.floor(wave.length / W);

@@ -8,6 +8,7 @@
 interface Props {
   value: number;          // 0–100
   onChange: (v: number) => void;
+  lang?: "de" | "en";
 }
 
 const PRESETS = [
@@ -18,8 +19,8 @@ const PRESETS = [
 ];
 
 function getIntensityColor(v: number): string {
-  if (v < 40)  return "#7c6fff";   // purple — subtle
-  if (v < 70)  return "#00e5c4";   // cyan — balanced
+  if (v < 40)  return "#f2a65a";   // amber — subtle
+  if (v < 70)  return "#58e0b5";   // mint — balanced
   if (v < 90)  return "#f5c842";   // gold — loud
   return "#ff4757";                // red — max
 }
@@ -33,7 +34,7 @@ function getIntensityLabel(v: number): string {
   return "Maximum";
 }
 
-export default function MasteringIntensity({ value, onChange }: Props) {
+export default function MasteringIntensity({ value, onChange, lang = "de" }: Props) {
   const color = getIntensityColor(value);
   const label = getIntensityLabel(value);
   const pct   = value;
@@ -45,7 +46,7 @@ export default function MasteringIntensity({ value, onChange }: Props) {
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="label" title="Steuert wie stark das Mastering den Track beeinflusst. Niedrig = transparent, Hoch = laut & punchy.">Mastering Intensity</span>
+        <span className="label" title="Steuert wie stark das Mastering den Track beeinflusst. Niedrig = transparent, Hoch = laut & druckvoll.">{lang === "de" ? "Mastering-Intensität" : "Mastering Intensity"}</span>
         <div className="flex items-center gap-1.5">
           <span
             className="mono text-xs font-bold tabular-nums"
@@ -78,7 +79,7 @@ export default function MasteringIntensity({ value, onChange }: Props) {
             className="h-full rounded-full transition-all duration-150"
             style={{
               width: `${pct}%`,
-              background: `linear-gradient(90deg, #7c6fff, ${color})`,
+              background: `linear-gradient(90deg, #f2a65a, ${color})`,
               boxShadow: `0 0 8px ${color}66`,
             }}
           />

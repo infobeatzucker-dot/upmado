@@ -16,7 +16,7 @@ function generateNoiseFloor(bars: number, t: number): number[] {
   for (let i = 0; i < bars; i++) {
     const x    = i / bars;
     const base = -60 + 20 * Math.exp(-3 * x) + 10 * Math.sin(x * Math.PI * 2) * Math.sin(t * 0.5 + i * 0.3);
-    data[i]    = base + (Math.random() - 0.5) * 4;
+    data[i]    = base + Math.sin(t * 4.2 + i * 1.73) * 1.8 + Math.sin(t * 2.1 + i * 0.41) * 1.2;
   }
   return data;
 }
@@ -42,12 +42,12 @@ export default function SpectrumAnalyzer({ isProcessing, hasPostData, analyser }
       ctx.clearRect(0, 0, W, H);
 
       // Grid lines
-      ctx.strokeStyle = "rgba(124,111,255,0.06)";
+      ctx.strokeStyle = "rgba(88,224,181,0.075)";
       ctx.lineWidth   = 1;
       for (let db = -20; db >= -80; db -= 20) {
         const y = ((db + 0) / -80) * (H - 20);
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-        ctx.fillStyle = "rgba(69,77,104,0.6)";
+        ctx.fillStyle = "rgba(154,166,162,0.58)";
         ctx.font      = "8px monospace";
         ctx.fillText(`${db}`, 2, y - 2);
       }
@@ -98,11 +98,11 @@ export default function SpectrumAnalyzer({ isProcessing, hasPostData, analyser }
         const barH   = normDb * (H - 20);
         const y      = H - 20 - barH;
 
-        // Frequency color gradient: purple → cyan
+        // Hardware-style frequency gradient: warm amber → phosphor mint
         const frac = i / NUM_BARS;
-        const r    = frac < 0.3 ? 124 : frac < 0.6 ? 60 : 0;
-        const g    = frac < 0.3 ? 111 : frac < 0.7 ? 180 : 229;
-        const b    = frac < 0.3 ? 255 : frac < 0.6 ? 200 : 196;
+        const r    = Math.round(242 + (88 - 242) * frac);
+        const g    = Math.round(166 + (224 - 166) * frac);
+        const b    = Math.round(90 + (181 - 90) * frac);
 
         const grad = ctx.createLinearGradient(x, y, x, H - 20);
         grad.addColorStop(0, `rgba(${r},${g},${b},0.75)`);
@@ -114,7 +114,7 @@ export default function SpectrumAnalyzer({ isProcessing, hasPostData, analyser }
         if (barDbPost) {
           const postNorm = Math.max(0, Math.min(1, (barDbPost[i] + 80) / 80));
           const postH    = postNorm * (H - 20);
-          ctx.fillStyle  = "rgba(0,229,196,0.35)";
+          ctx.fillStyle  = "rgba(88,224,181,0.32)";
           ctx.fillRect(x, H - 20 - postH, barW - 1, postH);
         }
 
@@ -133,7 +133,7 @@ export default function SpectrumAnalyzer({ isProcessing, hasPostData, analyser }
       }
 
       // Freq labels
-      ctx.fillStyle = "rgba(69,77,104,0.8)";
+      ctx.fillStyle = "rgba(154,166,162,0.72)";
       ctx.font      = "8px monospace";
       FREQ_LABELS.forEach((label, i) => {
         const x = (i / (FREQ_LABELS.length - 1)) * (W - 20) + 10;

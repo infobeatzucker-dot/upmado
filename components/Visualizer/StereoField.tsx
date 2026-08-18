@@ -34,7 +34,7 @@ export default function StereoField({
       const H = canvas.height;
 
       // Fade trail
-      ctx.fillStyle = "rgba(8,10,15,0.15)";
+      ctx.fillStyle = "rgba(9,13,14,0.18)";
       ctx.fillRect(0, 0, W, H);
 
       const cx     = W / 2;
@@ -42,7 +42,7 @@ export default function StereoField({
       const radius = Math.min(cx, cy) - 10;
 
       // Crosshair
-      ctx.strokeStyle = "rgba(69,77,104,0.3)";
+      ctx.strokeStyle = "rgba(154,166,162,0.2)";
       ctx.lineWidth   = 1;
       ctx.beginPath();
       ctx.moveTo(cx, 0); ctx.lineTo(cx, H);
@@ -50,14 +50,14 @@ export default function StereoField({
       ctx.stroke();
 
       // Diagonal guides
-      ctx.strokeStyle = "rgba(69,77,104,0.15)";
+      ctx.strokeStyle = "rgba(242,166,90,0.12)";
       ctx.beginPath();
       ctx.moveTo(cx - radius, cy + radius); ctx.lineTo(cx + radius, cy - radius);
       ctx.moveTo(cx - radius, cy - radius); ctx.lineTo(cx + radius, cy + radius);
       ctx.stroke();
 
       // Circle border
-      ctx.strokeStyle = "rgba(124,111,255,0.1)";
+      ctx.strokeStyle = "rgba(88,224,181,0.16)";
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.stroke();
@@ -89,7 +89,7 @@ export default function StereoField({
 
         for (let i = 0; i < numPts; i++) {
           const phase = t * (2 + i * 0.5) + i * Math.PI / 4;
-          const amp   = 0.3 + Math.random() * 0.5;
+          const amp   = 0.52 + Math.sin(t * 1.7 + i * 2.13) * 0.2;
           const L     = Math.sin(phase) * amp;
           const R     = Math.sin(phase + width * 0.5) * amp;
           const x     = cx + ((L + R) / Math.SQRT2) * radius * 0.7;
@@ -102,7 +102,7 @@ export default function StereoField({
       trailPoints.current = trailPoints.current.filter((p) => {
         p.age += analyserL ? 0.08 : 0.05;
         const alpha = Math.max(0, 1 - p.age);
-        ctx.fillStyle  = `rgba(0,229,196,${(alpha * 0.85).toFixed(2)})`;
+        ctx.fillStyle  = `rgba(88,224,181,${(alpha * 0.85).toFixed(2)})`;
         const size     = Math.max(0.5, 2 * (1 - p.age * 0.7));
         ctx.beginPath();
         ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
@@ -131,12 +131,12 @@ export default function StereoField({
       }
 
       const corrNorm  = (corr + 1) / 2;
-      const corrColor = corr > 0.5 ? "#4ade80" : corr > 0 ? "#facc15" : "#ff4757";
+      const corrColor = corr > 0.5 ? "#58e0b5" : corr > 0 ? "#f2a65a" : "#ff6b64";
       ctx.fillStyle = corrColor;
       ctx.fillRect(0, corrY, corrNorm * W, corrH);
 
       // Labels
-      ctx.fillStyle  = "rgba(69,77,104,0.8)";
+      ctx.fillStyle  = "rgba(154,166,162,0.72)";
       ctx.font       = "8px monospace";
       ctx.textAlign  = "center";
       ctx.fillText("L",    cx - radius + 5, cy - 2);

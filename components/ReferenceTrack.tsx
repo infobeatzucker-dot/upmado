@@ -32,6 +32,7 @@ interface Props {
   savedRefs?: SavedRef[];
   onSaveRef?: (analysis: ReferenceAnalysis, name: string) => Promise<void>;
   onDeleteRef?: (id: string) => Promise<void>;
+  lang?: "de" | "en";
 }
 
 function fmtDate(iso: string) {
@@ -233,6 +234,7 @@ export default function ReferenceTrack({
   savedRefs = [],
   onSaveRef,
   onDeleteRef,
+  lang = "de",
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [filename, setFilename]         = useState<string | null>(null);
@@ -359,7 +361,7 @@ export default function ReferenceTrack({
         {/* Header row */}
         <div className="flex items-center justify-between mb-2">
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span className="label">Reference Track</span>
+            <span className="label">{lang === "de" ? "Referenz-Track" : "Reference Track"}</span>
             {canSaveRefs && (
               <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                 {savedRefs.length}/{refLimit}
@@ -377,7 +379,7 @@ export default function ReferenceTrack({
             )}
             {filename && (
               <button onClick={handleClear} className="text-xs transition-opacity hover:opacity-70" style={{ color: "var(--text-muted)" }}>
-                ✕ Clear
+                ✕ {lang === "de" ? "Entfernen" : "Clear"}
               </button>
             )}
           </div>
@@ -398,7 +400,7 @@ export default function ReferenceTrack({
                   color: view === v ? "var(--accent-gold)" : "var(--text-muted)",
                 }}
               >
-                {v === "upload" ? "↑ Upload" : "📚 Bibliothek"}
+                {v === "upload" ? (lang === "de" ? "↑ Hochladen" : "↑ Upload") : (lang === "de" ? "📚 Bibliothek" : "📚 Library")}
               </button>
             ))}
           </div>
@@ -501,7 +503,7 @@ export default function ReferenceTrack({
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            Upload reference (WAV / MP3)
+            {lang === "de" ? "Referenz hochladen (WAV / MP3)" : "Upload reference (WAV / MP3)"}
           </button>
         )}
 

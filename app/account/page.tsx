@@ -300,7 +300,7 @@ export default function AccountPage() {
   const pct = Math.min(100, Math.round(data.dailyUsed / data.dailyLimit * 100));
 
   const section = (title: string, children: React.ReactNode) => (
-    <section style={{
+    <section className="precision-account-card" style={{
       background: "var(--bg-elevated, #1a1a2e)",
       border: "1px solid rgba(255,255,255,0.07)",
       borderRadius: "12px",
@@ -326,7 +326,7 @@ export default function AccountPage() {
   });
 
   return (
-    <div style={{ background: "var(--bg-primary)", minHeight: "100vh" }}>
+    <div className="precision-shell precision-account-page" style={{ background: "var(--bg-primary)", minHeight: "100vh" }}>
       <Header />
 
       {/* Download error toast */}
@@ -344,13 +344,13 @@ export default function AccountPage() {
         </div>
       )}
 
-      <main style={{ maxWidth: "720px", margin: "0 auto", padding: "6rem 1.5rem 4rem" }}>
+      <main className="precision-account-main" style={{ maxWidth: "920px", margin: "0 auto", padding: "7rem 1.5rem 4rem" }}>
 
         {/* Hero */}
-        <div style={{ marginBottom: "2rem" }}>
+        <div className="precision-account-hero" style={{ marginBottom: "2rem" }}>
           <div style={{
-            display: "inline-block", background: "rgba(124,111,255,0.1)",
-            border: "1px solid rgba(124,111,255,0.25)", borderRadius: "6px",
+            display: "inline-block", background: "rgba(242,166,90,0.1)",
+            border: "1px solid rgba(242,166,90,0.25)", borderRadius: "6px",
             padding: "0.25rem 0.75rem", fontSize: "0.72rem", color: "var(--accent-purple)",
             letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.75rem",
           }}>Konto</div>
@@ -399,7 +399,7 @@ export default function AccountPage() {
             </div>
             <button type="submit" style={{
               padding: "0.55rem 1.25rem", borderRadius: "7px", border: "none",
-              background: "rgba(124,111,255,0.2)", color: "var(--accent-purple)",
+              background: "rgba(242,166,90,0.14)", color: "var(--accent-purple)",
               fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", flexShrink: 0,
             }}>Speichern</button>
             {nameMsg && <div style={{ width: "100%", ...msgStyle(nameMsg) }}>{nameMsg}</div>}
@@ -417,7 +417,7 @@ export default function AccountPage() {
                    value={newPw2} onChange={e => setNewPw2(e.target.value)} required />
             <button type="submit" style={{
               padding: "0.55rem 1.25rem", borderRadius: "7px", border: "none", width: "fit-content",
-              background: "rgba(124,111,255,0.2)", color: "var(--accent-purple)",
+              background: "rgba(242,166,90,0.14)", color: "var(--accent-purple)",
               fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
             }}>Passwort ändern</button>
             {pwMsg && <div style={msgStyle(pwMsg)}>{pwMsg}</div>}
@@ -495,14 +495,14 @@ export default function AccountPage() {
                                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                                   width: 26, height: 26, borderRadius: "50%", border: "none", cursor: "pointer",
                                   background: playingMasterId === m.id
-                                    ? "rgba(0,229,196,0.18)"
+                                    ? "rgba(88,224,181,0.18)"
                                     : "rgba(255,255,255,0.06)",
                                   color: playingMasterId === m.id ? "var(--accent-cyan)" : "var(--text-muted)",
                                   transition: "all 0.15s",
                                   flexShrink: 0,
                                 }}
-                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,229,196,0.2)")}
-                                onMouseLeave={e => (e.currentTarget.style.background = playingMasterId === m.id ? "rgba(0,229,196,0.18)" : "rgba(255,255,255,0.06)")}
+                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(88,224,181,0.2)")}
+                                onMouseLeave={e => (e.currentTarget.style.background = playingMasterId === m.id ? "rgba(88,224,181,0.18)" : "rgba(255,255,255,0.06)")}
                               >
                                 {previewLoading === m.id ? (
                                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
@@ -535,7 +535,7 @@ export default function AccountPage() {
                                   display: "inline-flex", alignItems: "center", gap: "0.3rem",
                                   padding: "0.22rem 0.55rem", borderRadius: "5px", fontSize: "0.72rem",
                                   fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer",
-                                  background: "rgba(0,229,196,0.1)", border: "1px solid rgba(0,229,196,0.3)",
+                                  background: "rgba(88,224,181,0.1)", border: "1px solid rgba(88,224,181,0.3)",
                                   color: downloadingId === m.id ? "var(--text-muted)" : "var(--accent-cyan)",
                                 }}
                               >
@@ -684,7 +684,7 @@ export default function AccountPage() {
               onClick={handleExportDownload}
               style={{
                 display: "inline-block", padding: "0.5rem 1.1rem",
-                background: "rgba(124,111,255,0.1)", border: "1px solid rgba(124,111,255,0.25)",
+                background: "rgba(242,166,90,0.1)", border: "1px solid rgba(242,166,90,0.25)",
                 color: "var(--accent-purple)", borderRadius: "7px",
                 fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
               }}

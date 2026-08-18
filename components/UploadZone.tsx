@@ -10,6 +10,7 @@ interface Props {
   setAppState: (state: AppState) => void;
   uploadedFile: UploadedFile | null;
   isAuthenticated?: boolean;
+  lang?: "de" | "en";
 }
 
 const ACCEPTED_FORMATS = [".wav", ".flac", ".mp3", ".aiff", ".ogg", ".m4a"];
@@ -60,6 +61,7 @@ export default function UploadZone({
   setAppState,
   uploadedFile,
   isAuthenticated = false,
+  lang = "de",
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -301,7 +303,7 @@ export default function UploadZone({
             border: "1px solid var(--border-subtle)",
           }}
         >
-          Replace
+          {lang === "de" ? "Ersetzen" : "Replace"}
         </button>
         <input
           ref={inputRef}
@@ -333,10 +335,10 @@ export default function UploadZone({
           </svg>
         </div>
         <h3 className="text-base font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
-          Sign in to upload
+          {lang === "de" ? "Zum Hochladen anmelden" : "Sign in to upload"}
         </h3>
         <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
-          Create a free account to start mastering your tracks
+          {lang === "de" ? "Erstelle ein kostenloses Konto und mastere deine Tracks" : "Create a free account to start mastering your tracks"}
         </p>
         <button
           onClick={() => signIn()}
@@ -346,10 +348,10 @@ export default function UploadZone({
             color: "#fff",
           }}
         >
-          Sign In / Register
+          {lang === "de" ? "Anmelden / Registrieren" : "Sign In / Register"}
         </button>
         <p className="text-xs mt-3" style={{ color: "var(--text-muted)" }}>
-          100% free · 10 masters per day · No credit card required
+          {lang === "de" ? "100% kostenlos · 10 Masters pro Tag · Keine Kreditkarte" : "100% free · 10 masters per day · No credit card required"}
         </p>
       </div>
     );
@@ -390,10 +392,12 @@ export default function UploadZone({
       </div>
 
       <h3 className="text-base font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
-        {isDragging ? "Drop your track here" : "Upload your track"}
+        {isDragging
+          ? (lang === "de" ? "Track hier ablegen" : "Drop your track here")
+          : (lang === "de" ? "Track hochladen" : "Upload your track")}
       </h3>
       <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
-        Drag & drop or click to browse
+        {lang === "de" ? "Per Drag & Drop oder Klick auswählen" : "Drag & drop or click to browse"}
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         {ACCEPTED_FORMATS.map((fmt) => (
@@ -410,7 +414,7 @@ export default function UploadZone({
         ))}
       </div>
       <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-        Max {MAX_SIZE_MB}MB · Stereo or Mono
+        {lang === "de" ? `Max. ${MAX_SIZE_MB} MB · Stereo oder Mono` : `Max ${MAX_SIZE_MB}MB · Stereo or Mono`}
       </p>
 
       {error && (

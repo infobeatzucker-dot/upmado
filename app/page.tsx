@@ -19,6 +19,7 @@ import TestimonialsSection from "@/components/TestimonialsSection";
 import ScrollToTop from "@/components/ScrollToTop";
 import MasteringProgressModal from "@/components/MasteringProgressModal";
 import PromoPopup from "@/components/PromoPopup";
+import BeforeAfterConsole from "@/components/BeforeAfterConsole";
 import { AudioEngineProvider, useAudioEngine } from "@/contexts/AudioEngineContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { DAILY_MASTER_LIMIT } from "@/lib/constants";
@@ -305,11 +306,11 @@ export default function Home() {
   const masteredUrl = masterData?.formats.mp3128 || masterData?.formats.mp3320 || masterData?.formats.wav16 || "";
 
   return (
-    <div className="min-h-screen grid-bg">
+    <div className="min-h-screen precision-shell">
       <Header />
 
       {/* Hero */}
-      <section className="relative pt-24 pb-8 px-4 text-center overflow-hidden">
+      <section className="precision-hero relative pt-24 pb-10 px-4 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           {/* Video background — objectPosition: top to avoid top-clipping.
               src is set client-side after mount (see effect below) so the
@@ -323,20 +324,20 @@ export default function Home() {
             preload="none"
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ opacity: 0.28, filter: "blur(1px) saturate(1.4)", objectPosition: "top center" }}
+            style={{ opacity: 0.16, filter: "grayscale(1) contrast(1.18) sepia(.18)", objectPosition: "top center" }}
           />
           {/* Dark overlay */}
           <div
             className="absolute inset-0"
-            style={{ background: "linear-gradient(to bottom, rgba(8,10,18,0.3) 0%, rgba(8,10,18,0.05) 50%, rgba(8,10,18,0.7) 100%)" }}
+            style={{ background: "linear-gradient(to bottom, rgba(9,13,14,.62) 0%, rgba(9,13,14,.34) 45%, rgba(9,13,14,.96) 100%)" }}
           />
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full"
-            style={{ background: "radial-gradient(ellipse at center, rgba(124,111,255,0.08) 0%, transparent 70%)" }}
+            style={{ background: "radial-gradient(ellipse at center, rgba(242,166,90,.12) 0%, transparent 70%)" }}
           />
         </div>
         <motion.div
-          className="relative z-10 max-w-4xl mx-auto"
+          className="precision-hero-copy relative z-10 max-w-5xl mx-auto text-center"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
@@ -349,16 +350,16 @@ export default function Home() {
             transition={{ duration: 0.5 }}
           >
             <div
-              className="flex items-center gap-2 px-4 py-2 rounded-full"
+              className="precision-free-badge flex items-center gap-2 px-4 py-2 rounded-full"
               style={{
-                background: "linear-gradient(135deg, rgba(0,229,196,0.15), rgba(124,111,255,0.1))",
-                border: "1px solid rgba(0,229,196,0.45)",
-                boxShadow: "0 0 24px rgba(0,229,196,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+                background: "linear-gradient(135deg, rgba(88,224,181,.11), rgba(242,166,90,.08))",
+                border: "1px solid rgba(88,224,181,.28)",
+                boxShadow: "0 14px 38px rgba(0,0,0,.2), inset 0 1px rgba(255,255,255,.05)",
               }}
             >
               <span
                 className="flex items-center justify-center rounded-full flex-shrink-0"
-                style={{ width: 18, height: 18, background: "rgba(0,229,196,0.25)" }}
+                style={{ width: 18, height: 18, background: "rgba(88,224,181,.15)" }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
@@ -387,8 +388,8 @@ export default function Home() {
                   cursor: "pointer",
                   border: "1px solid",
                   transition: "all 0.15s",
-                  background: lang === l ? "rgba(124,111,255,0.2)" : "rgba(255,255,255,0.05)",
-                  borderColor: lang === l ? "rgba(124,111,255,0.5)" : "rgba(255,255,255,0.1)",
+                  background: lang === l ? "rgba(242,166,90,.13)" : "rgba(255,255,255,0.035)",
+                  borderColor: lang === l ? "rgba(242,166,90,.38)" : "rgba(255,255,255,0.08)",
                   color: lang === l ? "var(--accent-purple)" : "var(--text-muted)",
                   letterSpacing: "0.08em",
                 }}
@@ -406,10 +407,9 @@ export default function Home() {
           >
             {T.hero_badge[lang]}
           </motion.div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-2">
-            <span style={{ color: "var(--accent-purple)" }}>Up</span>
-            <span style={{ color: "var(--accent-cyan)" }}>Ma</span>
-            <span style={{ color: "#f59e0b" }}>Do</span>
+          <h1 className="precision-hero-title text-5xl md:text-7xl font-bold tracking-tight mb-2">
+            <span style={{ color: "var(--text-primary)" }}>UpMa</span>
+            <span style={{ color: "var(--accent-purple)" }}>Do</span>
           </h1>
           <div className="flex items-center justify-center gap-2 mb-4" style={{ color: "var(--text-muted)", fontSize: "0.85rem", letterSpacing: "0.05em" }}>
             {T.hero_tagline[lang].map((item, i, arr) => (
@@ -422,21 +422,28 @@ export default function Home() {
           <p className="text-lg md:text-xl max-w-2xl mx-auto" style={{ color: "var(--text-secondary)" }}>
             {T.hero_desc[lang]}
           </p>
+          <a href="#mastering-console" className="precision-primary-cta">
+            {lang === "de" ? "Mastering starten" : "Start mastering"}<span aria-hidden="true">→</span>
+          </a>
         </motion.div>
       </section>
 
       {/* Main Mastering Interface */}
-      <main className="max-w-6xl mx-auto px-4 pb-32" ref={mainPanelRef}>
+      <main id="mastering-console" className="precision-mastering-wrap max-w-7xl mx-auto px-4 pb-32" ref={mainPanelRef}>
         <ErrorBoundary>
         <AudioEngineProvider originalUrl={originalUrl} masteredUrl={masteredUrl}>
           <div
-            className="glass-panel-elevated p-6 md:p-8 relative"
+            className="precision-mastering-console glass-panel-elevated p-5 md:p-7 relative"
             style={{
               boxShadow: appState === "mastering"
-                ? "0 0 40px rgba(124,111,255,0.2), 0 0 80px rgba(0,229,196,0.05)"
-                : "0 4px 40px rgba(0,0,0,0.4)",
+                ? "0 0 42px rgba(242,166,90,.13), 0 0 90px rgba(88,224,181,.05)"
+                : "0 28px 90px rgba(0,0,0,.38)",
             }}
           >
+            <div className="precision-console-heading">
+              <div><span>UPMADO · PRECISION MASTERING</span><h2>{lang === "de" ? "Mastering-Konsole" : "Mastering console"}</h2></div>
+              <span className="precision-ready"><i />{lang === "de" ? "System bereit" : "System ready"}</span>
+            </div>
             {/* Daily usage counter (fair-use limit, applies to everyone) */}
             {sessionStatus === "authenticated" && dailyUsed !== null && (
               <div style={{
@@ -461,11 +468,35 @@ export default function Home() {
               </div>
             )}
 
-            {/* Panel header row — Platform + Preset + optional "Neue Datei" link */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <PlatformTargets value={platform} onChange={setPlatform} />
-              <div className="flex flex-col gap-1">
-                <PresetSelector value={preset} onChange={setPreset} />
+            {/* Studio Deck — targets, central track surface and sound character */}
+            <div className="precision-deck-grid">
+              <div className="precision-deck-module precision-deck-platform">
+                <PlatformTargets value={platform} onChange={setPlatform} lang={lang} />
+              </div>
+
+              <div className="precision-deck-center">
+                <div className="precision-deck-center-label">
+                  <span>{lang === "de" ? "TRACK-EINGANG" : "TRACK INPUT"}</span>
+                  <i />
+                  <small>{lang === "de" ? "BEREIT" : "READY"}</small>
+                </div>
+                <AnimatePresence mode="wait">
+                  {(appState === "idle" || appState === "uploaded" || appState === "analyzing") ? (
+                    <motion.div key="upload-deck" initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }} className="precision-deck-upload">
+                      <UploadZone lang={lang} onUploadComplete={handleUploadComplete} onAnalysisComplete={handleAnalysisComplete} setAppState={setAppState} uploadedFile={uploadedFile} isAuthenticated={sessionStatus === "authenticated"} />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="track-ready" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="precision-track-ready">
+                      <div className="precision-track-orbit"><i /><i /><i /></div>
+                      <span>{lang === "de" ? "TRACK ANALYSIERT" : "TRACK ANALYZED"}</span>
+                      <strong>{uploadedFile?.filename}</strong>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="precision-deck-module precision-deck-preset flex flex-col gap-1">
+                <PresetSelector value={preset} onChange={setPreset} lang={lang} />
                 {/* "Neue Datei" appears under preset when a file is loaded */}
                 <AnimatePresence>
                   {appState !== "idle" && (
@@ -489,36 +520,16 @@ export default function Home() {
             </div>
 
             {/* Intensity + Reference Track row */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <MasteringIntensity value={intensity} onChange={setIntensity} />
+            <div className="precision-secondary-grid grid md:grid-cols-2 gap-4 mb-6">
+              <MasteringIntensity value={intensity} onChange={setIntensity} lang={lang} />
               <ReferenceTrack
+                lang={lang}
                 onReference={(a) => setReferenceAnalysis(a as AnalysisData | null)}
                 savedRefs={savedRefs}
                 onSaveRef={handleSaveRef}
                 onDeleteRef={handleDeleteRef}
               />
             </div>
-
-            {/* Upload Zone */}
-            <AnimatePresence mode="wait">
-              {(appState === "idle" || appState === "uploaded" || appState === "analyzing") && (
-                <motion.div
-                  key="upload"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <UploadZone
-                    onUploadComplete={handleUploadComplete}
-                    onAnalysisComplete={handleAnalysisComplete}
-                    setAppState={setAppState}
-                    uploadedFile={uploadedFile}
-                    isAuthenticated={sessionStatus === "authenticated"}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Player — shown after analysis (original only) */}
             <AnimatePresence>
@@ -672,6 +683,7 @@ export default function Home() {
       />
 
       <FeaturesSection lang={lang} />
+      <BeforeAfterConsole lang={lang} />
       <TestimonialsSection lang={lang} />
       <Footer />
       <ScrollToTop />

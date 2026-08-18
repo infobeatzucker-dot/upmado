@@ -87,12 +87,19 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
   const analyserR    = engine?.analyserR    ?? null;
 
   return (
-    <div className="mb-6">
+    <div className="precision-analysis-panel mb-6">
+      <div className="precision-analysis-heading">
+        <div>
+          <span>LIVE SIGNAL INTELLIGENCE</span>
+          <h3>Track-Analyse</h3>
+        </div>
+        <div className="precision-live-status"><i /> Analyzer aktiv</div>
+      </div>
       {/* Main visualizers grid */}
       <div className="grid md:grid-cols-3 gap-4 mb-4">
         {/* Spectrum Analyzer */}
-        <div className="glass-panel p-3 scanlines" style={{ height: 200 }}>
-          <div className="label mb-2">Spectrum Analyzer</div>
+        <div className="glass-panel precision-analyzer-card p-3" style={{ height: 210 }}>
+          <div className="precision-analyzer-title"><span>Frequenzspektrum</span><small>20 Hz — 20 kHz</small></div>
           <SpectrumAnalyzer
             isProcessing={isProcessing}
             hasPostData={postAnalysis !== null}
@@ -101,8 +108,8 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         </div>
 
         {/* Waveform Viewer */}
-        <div className="glass-panel p-3 scanlines" style={{ height: 200 }}>
-          <div className="label mb-2">Waveform</div>
+        <div className="glass-panel precision-analyzer-card p-3" style={{ height: 210 }}>
+          <div className="precision-analyzer-title"><span>Wellenform</span><small>ZEIT</small></div>
           <WaveformViewer
             isProcessing={isProcessing}
             hasPostData={postAnalysis !== null}
@@ -111,8 +118,8 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         </div>
 
         {/* Spectrogram Waterfall */}
-        <div className="glass-panel p-3 scanlines" style={{ height: 200 }}>
-          <div className="label mb-2">Spectrogram</div>
+        <div className="glass-panel precision-analyzer-card p-3" style={{ height: 210 }}>
+          <div className="precision-analyzer-title"><span>Spektrogramm</span><small>ENERGIE</small></div>
           <SpectrogramWaterfall
             analyser={analyserMono}
             isProcessing={isProcessing}
@@ -122,8 +129,8 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
 
       <div className="grid md:grid-cols-3 gap-4 mb-4">
         {/* LUFS Meter */}
-        <div className="glass-panel p-3 scanlines" style={{ height: 180 }}>
-          <div className="label mb-2">LUFS / True Peak</div>
+        <div className="glass-panel precision-analyzer-card p-3" style={{ height: 190 }}>
+          <div className="precision-analyzer-title"><span>Lautheit</span><small>LUFS / TRUE PEAK</small></div>
           <LUFSMeter
             integrated={preAnalysis.integrated_lufs}
             truePeak={preAnalysis.true_peak}
@@ -133,9 +140,9 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         </div>
 
         {/* Stereo Field */}
-        <div className="glass-panel p-3 scanlines" style={{ height: 180 }}>
+        <div className="glass-panel precision-analyzer-card p-3" style={{ height: 190 }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="label">Stereo Field</span>
+            <span className="precision-analyzer-title"><span>Stereofeld</span></span>
             {/* Mono compatibility badge */}
             {(() => {
               const mc = postAnalysis?.mono_compatibility ?? preAnalysis.mono_compatibility;
@@ -167,8 +174,8 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         </div>
 
         {/* Dynamics Graph */}
-        <div className="glass-panel p-3 scanlines" style={{ height: 180 }}>
-          <div className="label mb-2">Dynamics</div>
+        <div className="glass-panel precision-analyzer-card p-3" style={{ height: 190 }}>
+          <div className="precision-analyzer-title"><span>Dynamik</span><small>DR / CREST</small></div>
           <DynamicsGraph
             drValue={preAnalysis.dr_value}
             crestFactor={preAnalysis.crest_factor}
@@ -180,7 +187,7 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
       {/* Stats grid */}
       <div className="grid md:grid-cols-3 gap-4">
         {/* Loudness */}
-        <div className="glass-panel p-4">
+        <div className="glass-panel precision-stat-card p-4">
           <div className="label mb-3">Loudness</div>
           <CompareValue label="Integrated" pre={preAnalysis.integrated_lufs} post={postAnalysis?.integrated_lufs ?? null} unit=" LUFS" higherIsBetter={true} />
           <CompareValue label="True Peak"  pre={preAnalysis.true_peak}       post={postAnalysis?.true_peak ?? null}       unit=" dBTP" higherIsBetter={false} />
@@ -190,7 +197,7 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         </div>
 
         {/* Spectral */}
-        <div className="glass-panel p-4">
+        <div className="glass-panel precision-stat-card p-4">
           <div className="label mb-3">Spectral</div>
           <StatRow label="Centroid" value={(preAnalysis.spectral_centroid / 1000).toFixed(1)} unit="kHz" />
           <StatRow label="Rolloff"  value={(preAnalysis.spectral_rolloff  / 1000).toFixed(1)} unit="kHz" />
@@ -203,7 +210,7 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
         </div>
 
         {/* Track Info */}
-        <div className="glass-panel p-4">
+        <div className="glass-panel precision-stat-card p-4">
           <div className="label mb-3">Track Info</div>
           <StatRow label="BPM"         value={preAnalysis.bpm.toFixed(0)} />
           <StatRow label="Key"         value={preAnalysis.key} />
@@ -248,8 +255,8 @@ export default function AnalysisPanel({ preAnalysis, postAnalysis, isProcessing 
       )}
 
       {/* Frequency bands */}
-      <div className="glass-panel p-4 mt-4">
-        <div className="label mb-3">Frequency Band Energy</div>
+      <div className="glass-panel precision-frequency-card p-4 mt-4">
+        <div className="label mb-3">Frequenzband-Energie</div>
         <div className="grid grid-cols-5 gap-3">
           {[
             { label: "Sub",  value: preAnalysis.rms_sub,  post: postAnalysis?.rms_sub,  cls: "freq-sub"  },

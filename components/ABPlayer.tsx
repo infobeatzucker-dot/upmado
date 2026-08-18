@@ -59,7 +59,7 @@ export default function ABPlayer({ filename }: Props) {
     if (!wf) return;
     const bars    = wf.length;
     const barW    = W / bars;
-    const color   = isB ? "#00e5c4" : "#7c6fff";
+    const color   = isB ? "#58e0b5" : "#f2a65a";
     const progress = engine.currentTime / (engine.duration || 1);
 
     ctx.clearRect(0, 0, W, H);
@@ -88,7 +88,7 @@ export default function ABPlayer({ filename }: Props) {
     const px   = progress * W;
     const grad = ctx.createLinearGradient(px - 2, 0, px + 2, 0);
     grad.addColorStop(0,   "transparent");
-    grad.addColorStop(0.5, isB ? "#00e5c4" : "#7c6fff");
+    grad.addColorStop(0.5, isB ? "#58e0b5" : "#f2a65a");
     grad.addColorStop(1,   "transparent");
     ctx.fillStyle = grad;
     ctx.fillRect(px - 2, 0, 4, H);
@@ -120,7 +120,7 @@ export default function ABPlayer({ filename }: Props) {
           analyser.getByteTimeDomainData(td);
 
           const isB  = engine?.mode === "B";
-          const color = isB ? "#00e5c4" : "#7c6fff";
+          const color = isB ? "#58e0b5" : "#f2a65a";
 
           // Glow pass
           ctx.shadowBlur  = 8;
@@ -310,7 +310,7 @@ export default function ABPlayer({ filename }: Props) {
         {(["A", "B"] as const).map((m) => {
           const active   = mode === m;
           const disabled = m === "B" && (masterUnavailable || !engine.masteredUrl);
-          const mAccent  = m === "B" ? "#00e5c4" : "#7c6fff";
+          const mAccent  = m === "B" ? "#58e0b5" : "#f2a65a";
           return (
             <motion.button
               key={m}
@@ -416,8 +416,8 @@ export default function ABPlayer({ filename }: Props) {
             style={{
               width: `${progress}%`,
               background: isB
-                ? "linear-gradient(90deg, #7c6fff, #00e5c4)"
-                : "linear-gradient(90deg, #4a3fc7, #7c6fff)",
+                ? "linear-gradient(90deg, #f2a65a, #58e0b5)"
+                : "linear-gradient(90deg, #a9662f, #f2a65a)",
             }}
           />
           {/* Thumb */}

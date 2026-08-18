@@ -43,25 +43,22 @@ export default function Header() {
   return (
     <>
       <header
-        className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+        className="precision-header fixed top-0 left-0 right-0 z-50 transition-all duration-300"
         style={{
-          background: scrolled ? "rgba(8, 10, 15, 0.92)" : "rgba(8, 10, 15, 0.6)",
+          background: scrolled ? "rgba(9,13,14,.92)" : "rgba(9,13,14,.5)",
           backdropFilter: "blur(20px)",
           borderBottom: scrolled
-            ? "1px solid rgba(124,111,255,0.18)"
+            ? "1px solid rgba(242,166,90,.16)"
             : "1px solid rgba(255,255,255,0.04)",
           boxShadow: scrolled ? "0 4px 32px rgba(0,0,0,0.4)" : "none",
         }}
       >
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="precision-header-inner max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2" style={{ textDecoration: "none" }}>
-            <span className="font-black text-xl tracking-tight">
-              <span style={{ color: "var(--accent-purple)" }}>Up</span>
-              <span style={{ color: "var(--accent-cyan)" }}>Ma</span>
-              <span style={{ color: "#f59e0b" }}>Do</span>
-            </span>
+          <Link href="/" className="precision-brand flex items-center gap-2.5" style={{ textDecoration: "none" }}>
+            <span className="precision-brand-meter" aria-hidden="true">{[9,18,26,14,22,10].map((height, index) => <i key={index} style={{ height }} />)}</span>
+            <span className="font-black text-xl tracking-tight" style={{ color: "var(--text-primary)" }}>UpMa<span style={{ color: "var(--accent-purple)" }}>Do</span></span>
             <span
               className="hidden sm:block text-xs px-1.5 py-0.5 rounded font-semibold"
               style={{
@@ -76,10 +73,11 @@ export default function Header() {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="precision-nav hidden md:flex items-center gap-7">
             {[
               { label: "Home", href: "/" },
               { label: "Features", href: "/features" },
+              { label: "So funktioniert's", href: "/#features" },
               { label: "Hilfe", href: "/help" },
               { label: "Wissen", href: "/ressourcen" },
             ].map((item) => (
@@ -156,6 +154,8 @@ export default function Header() {
                 </>
               )
             }
+
+            <a href="/#mastering-console" className="precision-header-cta hidden lg:inline-flex">Jetzt mastern <span>→</span></a>
 
             {/* Mobile hamburger */}
             <button

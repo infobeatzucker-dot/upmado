@@ -1,43 +1,49 @@
 "use client";
 
 import { Preset } from "@/app/page";
+import { useState } from "react";
 
 const PRESETS: { id: Preset; label: string; emoji: string; desc: string }[] = [
-  { id: "electronic", label: "Electronic",  emoji: "⚡", desc: "Punchy, wide, loud" },
-  { id: "hiphop",     label: "Hip-Hop",     emoji: "🎤", desc: "Heavy low end" },
-  { id: "trap",       label: "Trap / Drill", emoji: "🔊", desc: "Hard 808s, crisp highs" },
-  { id: "dance",      label: "Dance / House",emoji: "🎛", desc: "Club-ready, pumping" },
-  { id: "rock",       label: "Rock",         emoji: "🎸", desc: "Dynamic, guitars" },
-  { id: "metal",      label: "Metal",        emoji: "🤘", desc: "Aggressive, powerful" },
-  { id: "pop",        label: "Pop",          emoji: "✨", desc: "Polished, bright" },
-  { id: "rnb",        label: "R&B / Soul",   emoji: "🎵", desc: "Warm, smooth, groovy" },
-  { id: "latin",      label: "Latin",        emoji: "🌶", desc: "Vibrant, rhythmic" },
-  { id: "country",    label: "Country",      emoji: "🪕", desc: "Natural, warm" },
-  { id: "jazz",       label: "Jazz",         emoji: "🎷", desc: "Natural, dynamic" },
-  { id: "classical",  label: "Classical",    emoji: "🎻", desc: "Wide, natural" },
-  { id: "ambient",    label: "Ambient",      emoji: "🌌", desc: "Spacious, cinematic" },
-  { id: "techno",     label: "Techno",       emoji: "🔩", desc: "Hard, industrial, punchy" },
-  { id: "edm",        label: "EDM",          emoji: "🎆", desc: "Festival-ready, massive" },
-  { id: "lofi",       label: "Lo-Fi",        emoji: "📻", desc: "Warm, slightly compressed" },
-  { id: "podcast",    label: "Podcast",      emoji: "🎙", desc: "Voice optimized" },
+  { id: "electronic", label: "Electronic",  emoji: "EL", desc: "Punchy, wide, loud" },
+  { id: "hiphop",     label: "Hip-Hop",     emoji: "HH", desc: "Heavy low end" },
+  { id: "trap",       label: "Trap / Drill", emoji: "TR", desc: "Hard 808s, crisp highs" },
+  { id: "dance",      label: "Dance / House",emoji: "DH", desc: "Club-ready, pumping" },
+  { id: "rock",       label: "Rock",         emoji: "RK", desc: "Dynamic, guitars" },
+  { id: "metal",      label: "Metal",        emoji: "MT", desc: "Aggressive, powerful" },
+  { id: "pop",        label: "Pop",          emoji: "PP", desc: "Polished, bright" },
+  { id: "rnb",        label: "R&B / Soul",   emoji: "RB", desc: "Warm, smooth, groovy" },
+  { id: "latin",      label: "Latin",        emoji: "LT", desc: "Vibrant, rhythmic" },
+  { id: "country",    label: "Country",      emoji: "CN", desc: "Natural, warm" },
+  { id: "jazz",       label: "Jazz",         emoji: "JZ", desc: "Natural, dynamic" },
+  { id: "classical",  label: "Classical",    emoji: "CL", desc: "Wide, natural" },
+  { id: "ambient",    label: "Ambient",      emoji: "AM", desc: "Spacious, cinematic" },
+  { id: "techno",     label: "Techno",       emoji: "TC", desc: "Hard, industrial, punchy" },
+  { id: "edm",        label: "EDM",          emoji: "ED", desc: "Festival-ready, massive" },
+  { id: "lofi",       label: "Lo-Fi",        emoji: "LF", desc: "Warm, slightly compressed" },
+  { id: "podcast",    label: "Podcast",      emoji: "PC", desc: "Voice optimized" },
 ];
 
 interface Props {
   value: Preset;
   onChange: (p: Preset) => void;
+  lang?: "de" | "en";
 }
 
-export default function PresetSelector({ value, onChange }: Props) {
+export default function PresetSelector({ value, onChange, lang = "de" }: Props) {
   const isAuto = value === "auto";
+  const [expanded, setExpanded] = useState(false);
+  const visiblePresets = expanded
+    ? PRESETS
+    : PRESETS.filter((preset, index) => index < 8 || preset.id === value);
 
   return (
-    <div>
-      <div className="label mb-2">Genre Preset</div>
+    <div className="precision-picker precision-preset-picker">
+      <div className="precision-picker-heading"><span>Genre-Preset</span><small>{lang === "de" ? "Klangcharakter" : "Sound character"}</small></div>
 
       {/* Auto AI — featured button */}
       <button
         onClick={() => onChange("auto")}
-        className="w-full mb-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+        className={`precision-auto-preset ${isAuto ? "active" : ""}`}
         style={{
           background: isAuto
             ? "linear-gradient(135deg, rgba(124,111,255,0.25), rgba(0,229,196,0.18))"
@@ -66,7 +72,7 @@ export default function PresetSelector({ value, onChange }: Props) {
             }}
           />
         )}
-        <span style={{ fontSize: "1rem" }}>🤖</span>
+        <span className="precision-ai-mark">AI</span>
         <span>Auto AI</span>
         <span
           className="text-xs px-1.5 py-0.5 rounded font-semibold"
@@ -77,25 +83,25 @@ export default function PresetSelector({ value, onChange }: Props) {
             letterSpacing: "0.05em",
           }}
         >
-          Empfohlen
+          {lang === "de" ? "Empfohlen" : "Recommended"}
         </span>
         {!isAuto && (
           <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginLeft: "auto" }}>
-            Analysiert Genre automatisch
+            {lang === "de" ? "Analysiert das Genre automatisch" : "Detects the genre automatically"}
           </span>
         )}
       </button>
 
       {/* Genre grid */}
-      <div className="flex flex-wrap gap-1.5">
-        {PRESETS.map((p) => {
+      <div className="precision-preset-grid">
+        {visiblePresets.map((p) => {
           const active = value === p.id;
           return (
             <button
               key={p.id}
               onClick={() => onChange(p.id)}
               title={p.desc}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5"
+              className={`precision-preset-tile ${active ? "active" : ""}`}
               style={{
                 background: active ? "rgba(0,229,196,0.15)" : "rgba(20,24,32,0.8)",
                 border: active ? "1px solid var(--accent-cyan)" : "1px solid var(--border-subtle)",
@@ -103,11 +109,22 @@ export default function PresetSelector({ value, onChange }: Props) {
                 boxShadow: active ? "0 0 12px rgba(0,229,196,0.15)" : "none",
               }}
             >
-              <span>{p.emoji}</span>
+              <span className="precision-preset-mark">{p.emoji}</span>
               <span>{p.label}</span>
             </button>
           );
         })}
+        <button
+          type="button"
+          className="precision-options-toggle precision-preset-toggle"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+        >
+          <span>{expanded ? "−" : "+"}</span>
+          {expanded
+            ? (lang === "de" ? "Weniger anzeigen" : "Show less")
+            : (lang === "de" ? "Weitere Genres" : "More genres")}
+        </button>
       </div>
     </div>
   );
